@@ -1,8 +1,6 @@
 <!-- 🔮 Animated banner -->
 <!-- placeholder banner -->
-<p align="center">
-  <img src="./art/hero.png" width="90%" alt="Animated tech banner" />
-</p>
+
 
 <h1 align="center">💻 Welcome to My GitHub Profile!</h1>
 
