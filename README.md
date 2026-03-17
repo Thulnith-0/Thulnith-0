@@ -36,7 +36,7 @@ Hi 👋 I'm **Thulnith**, a passionate tech student and developer focused on bui
 ## 🛠️ Tech Stack
 
 <p align="center">
-  <img src="https://skillicons.dev/icons?i=python,java,cs,js,html,css,react,spring,dotnet,mysql,mongodb,git,github" />
+  <img src="https://skillicons.dev/icons?i=python,java,cs,js,html,css,react,spring,dotnet,mysql,mongodb,git,github,vscode,idea" />
 </p>
 
 ---
@@ -93,6 +93,18 @@ Status      : Leveling up daily 🚀
 
 ---
 
+## 🐍 Contribution Snake
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Thulnith-0/Thulnith-0/output/github-snake-dark.svg" />
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Thulnith-0/Thulnith-0/output/github-snake.svg" />
+    <img alt="GitHub Snake" src="https://raw.githubusercontent.com/Thulnith-0/Thulnith-0/output/github-snake-dark.svg" />
+  </picture>
+</p>
+
+---
+
 ## 📫 Connect
 
 <p align="center">
@@ -101,17 +113,6 @@ Status      : Leveling up daily 🚀
   </a>
 </p>
 
----
-
-## 🐍 Contribution Snake
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Thulnith-0/Thulnith-0/output/github-snake-dark.svg" />
-    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Thulnith-0/Thulnith-0/output/github-snake.svg" />
-    <img alt="GitHub Snake" src="https://raw.githubusercontent.com/Thulnith-0/Thulnith-0/output/github-snake.svg" />
-  </picture>
-</p>
 ---
 
 <p align="center">
