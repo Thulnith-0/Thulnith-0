@@ -25,6 +25,7 @@
 
 Hi 👋 I'm **Thulnith**, a passionate tech student and developer focused on building real-world systems.
 
+* 📅 GitHub Age: **AUTO_GITHUB_AGE**
 * ⚡ Software Engineering & System Design
 * 🧠 Computer Vision, AI, IoT
 * 💻 Desktop Apps, Web Apps
