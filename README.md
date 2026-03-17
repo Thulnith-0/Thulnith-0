@@ -106,9 +106,12 @@ Status      : Leveling up daily 🚀
 ## 🐍 Contribution Snake
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Thulnith-0/Thulnith-0/output/github-contribution-grid-snake-dark.svg"/>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Thulnith-0/Thulnith-0/output/github-snake-dark.svg" />
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Thulnith-0/Thulnith-0/output/github-snake.svg" />
+    <img alt="GitHub Snake" src="https://raw.githubusercontent.com/Thulnith-0/Thulnith-0/output/github-snake.svg" />
+  </picture>
 </p>
-
 ---
 
 <p align="center">
