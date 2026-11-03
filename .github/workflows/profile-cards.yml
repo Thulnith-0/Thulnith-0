@@ -12,6 +12,7 @@ on:
     - cron: "17 */12 * * *"
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - ".github/profile/**"
       - ".github/workflows/profile-cards.yml"

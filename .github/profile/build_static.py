@@ -228,11 +228,14 @@ def footer(t, mode):
 
 # --------------------------------------------------------------------------- README
 
-LIVE = f"https://raw.githubusercontent.com/{C.LOGIN}/{C.LOGIN}/output"
+RAW = f"https://raw.githubusercontent.com/{C.LOGIN}/{C.LOGIN}"
+LIVE = f"{RAW}/output"
+# Absolute URLs: GitHub doesn't reliably rewrite relative paths inside <source srcset>.
+STATIC = f"{RAW}/main/assets"
 
 
 def pic(path: str, alt: str, width: str | None = "100%", live: bool = False) -> str:
-    base = LIVE if live else "assets"
+    base = LIVE if live else STATIC
     w = f' width="{width}"' if width else ""
     return (
         "<picture>"
