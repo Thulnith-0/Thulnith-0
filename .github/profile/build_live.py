@@ -25,9 +25,10 @@ IGNORED_LANGS = {"Batchfile", "Makefile", "Dockerfile", "Procfile", "CMake", "In
 
 # ------------------------------------------------------------------------------- data
 
-Q_PROFILE = """
-query($login: String!, $after: String) {
-  user(login: $login) {
+# `user(login:)` only lists public repos. When the token belongs to the profile
+# owner, `viewer` also lists their private repos, so the build uses that instead.
+PROFILE_FIELDS = """
+    login
     createdAt
     followers { totalCount }
     pullRequests { totalCount }
@@ -37,14 +38,17 @@ query($login: String!, $after: String) {
       pageInfo { hasNextPage endCursor }
       nodes {
         isFork
+        isPrivate
         stargazerCount
         languages(first: 12, orderBy: {field: SIZE, direction: DESC}) {
           edges { size node { name } }
         }
       }
     }
-  }
-}"""
+"""
+Q_PROFILE = "query($login: String!, $after: String) { user(login: $login) {" + PROFILE_FIELDS + "} }"
+Q_VIEWER = "query($after: String) { viewer {" + PROFILE_FIELDS + "} }"
+Q_WHOAMI = "query { viewer { login } }"
 
 Q_YEAR = """
 query($login: String!, $from: DateTime!, $to: DateTime!) {
@@ -72,15 +76,25 @@ def gql(query: str, variables: dict, token: str) -> dict:
 
 
 def fetch(login: str, token: str) -> dict:
+    try:
+        as_owner = gql(Q_WHOAMI, {}, token)["viewer"]["login"].lower() == login.lower()
+    except Exception:  # the Actions bot token can't query viewer
+        as_owner = False
     repos, after = [], None
     while True:
-        u = gql(Q_PROFILE, {"login": login, "after": after}, token)["user"]
+        if as_owner:
+            u = gql(Q_VIEWER, {"after": after}, token)["viewer"]
+        else:
+            u = gql(Q_PROFILE, {"login": login, "after": after}, token)["user"]
         repos += u["repositories"]["nodes"]
         page = u["repositories"]["pageInfo"]
         if not page["hasNextPage"]:
             break
         after = page["endCursor"]
 
+    private = sum(r["isPrivate"] for r in repos)
+    print(f"querying as {'owner (viewer)' if as_owner else 'public user'}: "
+          f"{len(repos)} repos ({private} private)")
     created = datetime.fromisoformat(u["createdAt"].replace("Z", "+00:00"))
     now = datetime.now(timezone.utc)
     days: dict[str, int] = {}
