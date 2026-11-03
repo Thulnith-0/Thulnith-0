@@ -16,7 +16,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import content as C
-from design import W, esc, panel, svg, text, text_width, write_pair
+from design import W, esc, panel, pulse, svg, text, text_width, write_pair
 
 API = "https://api.github.com/graphql"
 
@@ -206,6 +206,7 @@ def stats_card(d):
         w, h, x = HALF, 250, 28
         body = [
             f'<g class="f d1">{text(x, 44, "CONTRIBUTIONS · LAST 12 MONTHS", 11.5, t["accent"], 700, spacing=1.6)}</g>',
+            f'<g class="f d1">{pulse(w - x - 40, 40, 3.5, "#34A853")}{text(w - x, 44, "Live", 12, t["text2"], 600, anchor="end")}</g>',
             f'<g class="f d2">{text(x - 2, 104, fmt(d["year_total"]), 56, t["text"], 700, spacing=-2)}</g>',
             f'<g class="f d2">{text(x, 130, "On GitHub for " + age(d["created"]) + ", since " + datetime.fromisoformat(d["created"]).strftime("%b %Y"), 13.5, t["text2"], 500)}</g>',
             f'<line x1="{x}" y1="152" x2="{w - x}" y2="152" stroke="{t["line"]}"/>',
@@ -348,7 +349,7 @@ def activity_card(d):
             + grid
             + f'<path d="{area}" fill="url(#ar)" class="f d2"/>'
             + f'<path class="ln" d="{line}" fill="none" stroke="url(#ln)" stroke-width="3" stroke-linecap="round"/>'
-            + f'<circle cx="{pts[-1][0]:.1f}" cy="{pts[-1][1]:.1f}" r="5" fill="{b}" class="f d6"/>'
+            + pulse(pts[-1][0], pts[-1][1], 5, b)
             + text(x, 230, series[0].strftime("%b %d"), 12, t["text3"], 500)
             + text(W - x, 230, "Today", 12, t["text3"], 500, anchor="end")
         )
