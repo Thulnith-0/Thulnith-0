@@ -84,6 +84,7 @@ def section(eyebrow, title):
 SECTIONS = {
     "highlights": ("Highlights", "Numbers I'm proud of."),
     "work": ("Selected work", "Things I've built."),
+    "journey": ("Journey", "How I got here."),
     "stack": ("Toolkit", "What I build with."),
     "github": ("On GitHub", "The live numbers."),
     "connect": ("Say hello", "Let's connect."),
@@ -221,6 +222,153 @@ def social(item, idx=0):
     return render
 
 
+
+# --------------------------------------------------------------------------- terminal (about me)
+
+
+def terminal(t, mode):
+    """macOS-style terminal whose commands type themselves out, line by line."""
+    x0, top, lh = 32, 92, 30
+    h = top + len(C.TERMINAL) * lh * 2 + 18
+    bg = "#fbfbfd" if mode == "light" else "#0b0d11"
+    bar = "#ececf0" if mode == "light" else "#1a1d23"
+    prompt_c, cmd_c, out_c = t["accent"], t["text"], t["text2"]
+    css, body = [], [
+        f'<rect x="0.5" y="0.5" width="{W - 1}" height="{h - 1}" rx="18" fill="{bg}" stroke="{t["panel_line"] if mode == "dark" else t["line"]}"/>',
+        f'<path d="M0.5 44 V18.5 a18 18 0 0 1 18 -18 H{W - 18.5} a18 18 0 0 1 18 18 V44 Z" fill="{bar}"/>',
+        f'<line x1="0.5" y1="44" x2="{W - 0.5}" y2="44" stroke="{t["line"] if mode == "light" else t["panel_line"]}"/>',
+        '<circle cx="24" cy="22" r="6" fill="#ff5f57"/><circle cx="44" cy="22" r="6" fill="#febc2e"/><circle cx="64" cy="22" r="6" fill="#28c840"/>',
+        text(W / 2, 27, "thulnith — zsh — 80×24", 12.5, t["text3"], 500, anchor="middle"),
+    ]
+    delay = 0.6
+    y = top
+    for i, (cmd, out) in enumerate(C.TERMINAL):
+        prompt = "~ %"
+        pw = text_width(prompt, 15, 500) * 0.98 + 10
+        cw = len(cmd) * 9.05  # monospace advance at 15px
+        type_dur = max(0.35, len(cmd) * 0.055)
+        # cover slides right to reveal the command; at rest it sits past the text (fail-safe)
+        cx = x0 + pw
+        body.append(text(x0, y, prompt, 15, prompt_c, 600, family=MONO))
+        body.append(text(cx, y, cmd, 15, cmd_c, 500, family=MONO))
+        body.append(
+            f'<rect class="tw{i}" x="{cx + cw:.1f}" y="{y - 17}" width="{W - cx - cw - 20:.1f}" height="24" fill="{bg}"/>'
+        )
+        css.append(
+            f".tw{i}{{animation:tw{i} {type_dur:.2f}s steps({len(cmd)}) {delay:.2f}s backwards}}"
+            f"@keyframes tw{i}{{from{{transform:translateX(-{cw:.1f}px)}}to{{transform:none}}}}"
+        )
+        delay += type_dur + 0.15
+        body.append(
+            f'<g class="f" style="animation-delay:{delay:.2f}s">'
+            + text(x0, y + lh, out, 15, out_c, 400, family=MONO, extra='xml:space="preserve"')
+            + "</g>"
+        )
+        delay += 0.45
+        y += lh * 2
+    # blinking block cursor on a fresh prompt
+    cy = y
+    body.append(f'<g class="f" style="animation-delay:{delay:.2f}s">' + text(x0, cy - 0, "~ %", 15, prompt_c, 600, family=MONO)
+                + f'<rect class="cur" x="{x0 + 38}" y="{cy - 15}" width="9" height="19" rx="1.5" fill="{t["accent"]}"/></g>')
+    css.append(".cur{animation:blink 1.1s steps(1) infinite}@keyframes blink{50%{opacity:0}}")
+    h2 = cy + 26
+    body[0] = f'<rect x="0.5" y="0.5" width="{W - 1}" height="{h2 - 1}" rx="18" fill="{bg}" stroke="{t["panel_line"] if mode == "dark" else t["line"]}"/>'
+    title = "About me: " + " ".join(f"$ {c} → {o}." for c, o in C.TERMINAL)
+    return svg(W, h2, "".join(body), title, "".join(css))
+
+
+# --------------------------------------------------------------------------- now building ticker
+
+
+def now_building(t, mode):
+    h, n = 84, len(C.NOW)
+    period = n * 3.4
+    frac = 100 / n
+    css = [
+        f"@keyframes nb{{0%{{opacity:0;transform:translateY(12px)}}{frac * 0.12:.1f}%{{opacity:1;transform:none}}"
+        f"{frac * 0.88:.1f}%{{opacity:1;transform:none}}{frac:.1f}%,100%{{opacity:0;transform:translateY(-12px)}}}}"
+    ]
+    body = [panel(t, W, h, r=20)]
+    body.append(pulse(34, h / 2, 4, "#34A853"))
+    body.append(text(50, h / 2 + 4.5, "NOW BUILDING", 12, t["accent"], 700, spacing=1.8))
+    sx = 50 + text_width("NOW BUILDING", 12, 700) + 12 * 1.8 + 22
+    body.append(f'<line x1="{sx - 12}" y1="{h / 2 - 14}" x2="{sx - 12}" y2="{h / 2 + 14}" stroke="{t["line"]}"/>')
+    for i, item in enumerate(C.NOW):
+        rest = "" if i == 0 else ' opacity="0"'
+        css.append(f".nb{i}{{animation:nb {period:.1f}s cubic-bezier(.2,.7,.2,1) {i * period / n:.2f}s infinite}}")
+        body.append(f'<g class="nb{i}"{rest}>' + text(sx + 6, h / 2 + 6, item, 17, t["text"], 600, spacing=-0.2) + "</g>")
+    return svg(W, h, "".join(body), "Now building: " + "; ".join(C.NOW), "".join(css))
+
+
+# --------------------------------------------------------------------------- journey timeline
+
+
+def journey(t, mode):
+    n, h, pad = len(C.JOURNEY), 236, 78
+    step = (W - 2 * pad) / (n - 1)
+    ly = 118
+    a, b = t["grad"]
+    total = W - 2 * pad
+    defs = f'<linearGradient id="jl" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="{a}"/><stop offset="1" stop-color="{b}"/></linearGradient>'
+    css = [
+        f".jl{{stroke-dasharray:{total:.0f};animation:jl 2.6s cubic-bezier(.3,.6,.2,1) .3s backwards}}"
+        f"@keyframes jl{{from{{stroke-dashoffset:{total:.0f}}}}}"
+        ".jn{transform-box:fill-box;transform-origin:center;animation:jn .5s cubic-bezier(.3,1.6,.5,1) backwards}"
+        "@keyframes jn{from{transform:scale(0);opacity:0}}"
+    ]
+    body = [panel(t, W, h, r=22)]
+    body.append(f'<line x1="{pad}" y1="{ly}" x2="{W - pad}" y2="{ly}" stroke="{t["track"]}" stroke-width="3" stroke-linecap="round"/>')
+    body.append(f'<line class="jl" x1="{pad}" y1="{ly}" x2="{W - pad}" y2="{ly}" stroke="url(#jl)" stroke-width="3" stroke-linecap="round"/>')
+    for i, (when, what) in enumerate(C.JOURNEY):
+        x = pad + i * step
+        d = 0.3 + 2.6 * (i / (n - 1)) * 0.85
+        last = i == n - 1
+        up = i % 2 == 0
+        ty, dy = (ly - 46, ly - 28) if up else (ly + 44, ly + 62)
+        tick_y1, tick_y2 = (ly - 22, ly - 9) if up else (ly + 9, ly + 22)
+        node = (pulse(x, ly, 7, b) if last else
+                f'<circle cx="{x:.1f}" cy="{ly}" r="7" fill="{t["panel"]}" stroke="{a if i < n - 1 else b}" stroke-width="3"/>')
+        body.append(
+            f'<g class="jn" style="animation-delay:{d:.2f}s">{node}</g>'
+            f'<g class="f" style="animation-delay:{d + 0.1:.2f}s">'
+            f'<line x1="{x:.1f}" y1="{tick_y1}" x2="{x:.1f}" y2="{tick_y2}" stroke="{t["line"]}"/>'
+            + text(x, ty, what, 13, t["text"], 600, anchor="middle")
+            + text(x, dy, when, 11.5, t["text2"], 500, anchor="middle")
+            + "</g>"
+        )
+    body.append(text(W - 24, h - 18, "Dates are when each project's repo was started.", 11, t["text3"], 500, anchor="end"))
+    return svg(W, h, "".join(body), "Journey: " + "; ".join(f"{w} {x}" for w, x in C.JOURNEY), "".join(css), defs)
+
+
+# --------------------------------------------------------------------------- tech marquee
+
+
+def marquee(t, mode):
+    h, ch = 64, 36
+    seen, items = set(), []
+    for _, group in C.STACK:
+        for ic, label in group:
+            if label not in seen:
+                seen.add(label)
+                items.append((ic, label))
+    chips, x = [], 0.0
+    for ic, label in items:
+        s, cw = chip(t, x, (h - ch) / 2, label, 13, ic, ch)
+        chips.append(s)
+        x += cw + 10
+    loop = x
+    row = "".join(chips)
+    defs = (
+        '<linearGradient id="fade" x1="0" y1="0" x2="1" y2="0">'
+        '<stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".08" stop-color="#fff"/>'
+        '<stop offset=".92" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>'
+        f'<mask id="m"><rect width="{W}" height="{h}" fill="url(#fade)"/></mask>'
+    )
+    css = f".mq{{animation:mq {loop / 28:.1f}s linear infinite}}@keyframes mq{{to{{transform:translateX(-{loop:.1f}px)}}}}"
+    body = f'<g mask="url(#m)"><g class="mq">{row}<g transform="translate({loop:.1f} 0)">{row}</g></g></g>'
+    return svg(W, h, body, "Technologies: " + ", ".join(l for _, l in items), css, defs)
+
+
 # --------------------------------------------------------------------------- footer
 
 
@@ -263,6 +411,8 @@ def readme() -> str:
         "<!-- Generated by .github/profile/build_static.py. Edit content.py, then re-run it. -->",
         "",
         f'<p align="center">{pic("hero", f"{C.NAME}. {l1} {l2a}{l2b}{l2c}")}</p>',
+        f'<p align="center">{pic("now", "Now building: " + "; ".join(C.NOW))}</p>',
+        f'<p align="center">{pic("terminal", "About me: " + " ".join(f"{c}: {o}." for c, o in C.TERMINAL))}</p>',
         "",
         f'<p align="center">{pic("sections/highlights", "Highlights")}</p>',
         f'<p align="center">{pic("highlights", "; ".join(" ".join(h) for h in C.HIGHLIGHTS))}</p>',
@@ -283,13 +433,20 @@ def readme() -> str:
         "",
         "<br>",
         "",
+        f'<p align="center">{pic("sections/journey", "Journey")}</p>',
+        f'<p align="center">{pic("journey", "Journey: " + "; ".join(f"{w}: {x}" for w, x in C.JOURNEY))}</p>',
+        "",
+        "<br>",
+        "",
         f'<p align="center">{pic("sections/stack", "Toolkit")}</p>',
+        f'<p align="center">{pic("marquee", "Technologies I use")}</p>',
         f'<p align="center">{pic("stack", "; ".join(f"{g}: " + ", ".join(l for _, l in it) for g, it in C.STACK))}</p>',
         "",
         "<br>",
         "",
         f'<p align="center">{pic("sections/github", "On GitHub")}</p>',
         f'<p align="center">{pic("stats", "GitHub stats", "49%", True)} {pic("streak", "Contribution streak", "49%", True)}</p>',
+        f'<p align="center">{pic("heatmap", "Contribution calendar", live=True)}</p>',
         f'<p align="center">{pic("activity", "Activity over the last 30 days", live=True)}</p>',
         f'<p align="center">{pic("languages", "Top languages", live=True)}</p>',
         f'<p align="center">{pic("achievements", "Achievements", live=True)}</p>',
@@ -318,6 +475,10 @@ def main():
     write_pair(OUT, "highlights", highlights)
     write_pair(OUT, "stack", stack)
     write_pair(OUT, "footer", footer)
+    write_pair(OUT, "terminal", terminal)
+    write_pair(OUT, "now", now_building)
+    write_pair(OUT, "journey", journey)
+    write_pair(OUT, "marquee", marquee)
     for key, (eb, title) in SECTIONS.items():
         write_pair(OUT / "sections", key, section(eb, title))
     for i, p in enumerate(C.PROJECTS):

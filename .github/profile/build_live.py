@@ -359,6 +359,58 @@ def activity_card(d):
     return render
 
 
+def heatmap_card(d):
+    """Contribution calendar in the accent ramp, revealed by a diagonal wave."""
+    today = date.today()
+    start = today - timedelta(days=52 * 7 + (today.weekday() + 1) % 7)  # a Sunday ~1 year back
+    days = [(start + timedelta(days=i)) for i in range((today - start).days + 1)]
+    vals = [d["days"].get(x.isoformat(), 0) for x in days]
+    nz = sorted(v for v in vals if v > 0)
+    cuts = [nz[int(len(nz) * q)] for q in (0.25, 0.5, 0.75)] if nz else [1, 2, 3]
+
+    def level(v):
+        if v == 0:
+            return 0
+        return 1 + sum(v > c for c in cuts)
+
+    def render(t, mode):
+        x0, y0, cell, gap = 52, 74, 12, 3.2
+        a = t["accent"]
+        shades = [t["track"]] + [f'{a}{op}' for op in ("55", "88", "c4", "")]
+        weeks = (len(days) + 6) // 7
+        h = y0 + 7 * (cell + gap) + 58
+        cells, months, last_m = [], [], None
+        for i, (dt, v) in enumerate(zip(days, vals)):
+            col, row = i // 7, (dt.weekday() + 1) % 7
+            x, y = x0 + col * (cell + gap), y0 + row * (cell + gap)
+            delay = 0.2 + (col + row) * 0.018
+            cells.append(
+                f'<rect class="hc" style="animation-delay:{delay:.2f}s" x="{x:.1f}" y="{y:.1f}" width="{cell}" '
+                f'height="{cell}" rx="3" fill="{shades[level(v)]}"/>'
+            )
+            if row == 0 and dt.month != last_m and dt.day <= 7:
+                months.append(text(x, y0 - 12, dt.strftime("%b"), 11.5, t["text2"], 500))
+                last_m = dt.month
+        rows = "".join(text(x0 - 12, y0 + r * (cell + gap) + 10, n, 11, t["text3"], 500, anchor="end")
+                       for r, n in ((1, "Mon"), (3, "Wed"), (5, "Fri")))
+        total = sum(vals)
+        lx = W - 28 - 5 * (cell + 4) - 34
+        legend = (text(lx - 8, h - 22, "Less", 11, t["text3"], 500, anchor="end")
+                  + "".join(f'<rect x="{lx + k * (cell + 4):.1f}" y="{h - 32}" width="{cell}" height="{cell}" rx="3" fill="{c}"/>'
+                            for k, c in enumerate(shades))
+                  + text(lx + 5 * (cell + 4) + 4, h - 22, "More", 11, t["text3"], 500))
+        css = (".hc{transform-box:fill-box;transform-origin:center;animation:hc .6s cubic-bezier(.2,.8,.3,1.2) backwards}"
+               "@keyframes hc{from{opacity:0;transform:scale(.3)}}")
+        body = (
+            f'<g class="f d1">{text(28, 44, "CONTRIBUTION CALENDAR", 11.5, t["accent"], 700, spacing=1.6)}</g>'
+            + f'<g class="f d1">{text(W - 28, 44, "One square per day", 13, t["text2"], 500, anchor="end")}</g>'
+            + "".join(months) + rows + "".join(cells) + legend
+        )
+        return svg(W, h, panel(t, W, h, r=22) + body, f"Contribution calendar: {total} contributions over the last 53 weeks", css)
+
+    return render
+
+
 TIERS = [("Bronze", "#c08457"), ("Silver", "#9aa3ad"), ("Gold", "#d4a72c"), ("Platinum", None)]
 
 
@@ -456,6 +508,7 @@ def main():
         ("streak", streak_card),
         ("languages", languages_card),
         ("activity", activity_card),
+        ("heatmap", heatmap_card),
         ("achievements", achievements_card),
         ("joke", thought_card),
     ]:
