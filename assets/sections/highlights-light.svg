@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="96" viewBox="0 0 880 96" role="img" aria-label="Highlights: Numbers I&#x27;m proud of." font-family="-apple-system, BlinkMacSystemFont, &#x27;SF Pro Display&#x27;, &#x27;Segoe UI Variable Display&#x27;, &#x27;Segoe UI&#x27;, Inter, Roboto, &#x27;Helvetica Neue&#x27;, Arial, sans-serif"><title>Highlights: Numbers I&#x27;m proud of.</title><style>
+.f{animation:up .9s cubic-bezier(.2,.7,.2,1) backwards}
+.d1{animation-delay:.08s}.d2{animation-delay:.18s}.d3{animation-delay:.28s}
+.d4{animation-delay:.38s}.d5{animation-delay:.48s}.d6{animation-delay:.58s}
+@keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){*{animation:none!important}}
+</style><defs></defs><g class="f d1"><text x="2.0" y="30.0" font-size="12.5" font-weight="700" fill="#0071e3" letter-spacing="2.2">HIGHLIGHTS</text></g><g class="f d2"><text x="0.0" y="76.0" font-size="40" font-weight="700" fill="#1d1d1f" letter-spacing="-1.2">Numbers I&#x27;m proud of.</text></g></svg>

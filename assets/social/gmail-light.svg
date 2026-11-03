@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="94" height="40" viewBox="0 0 94 40" role="img" aria-label="Email" font-family="-apple-system, BlinkMacSystemFont, &#x27;SF Pro Display&#x27;, &#x27;Segoe UI Variable Display&#x27;, &#x27;Segoe UI&#x27;, Inter, Roboto, &#x27;Helvetica Neue&#x27;, Arial, sans-serif"><title>Email</title><style>
+.f{animation:up .9s cubic-bezier(.2,.7,.2,1) backwards}
+.d1{animation-delay:.08s}.d2{animation-delay:.18s}.d3{animation-delay:.28s}
+.d4{animation-delay:.38s}.d5{animation-delay:.48s}.d6{animation-delay:.58s}
+@keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){*{animation:none!important}}
+</style><defs></defs><rect x="0.5" y="0.5" width="92.8" height="39" rx="20.0" fill="#1d1d1f"/><path transform="translate(16.0 12.5) scale(0.6250)" d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z" fill="#ffffff" opacity="1.0"/><text x="39.0" y="24.9" font-size="13.5" font-weight="600" fill="#ffffff">Email</text></svg>
