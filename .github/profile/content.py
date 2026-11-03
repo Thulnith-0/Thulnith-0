@@ -135,3 +135,32 @@ SOCIALS = [
     ("discord", "Discord", "Say hi", "https://discord.com/users/922739470837637241"),
     ("gmail", "Email", "thulnithperera870@gmail.com", "mailto:thulnithperera870@gmail.com"),
 ]
+
+# Cycles in the "Now building" ticker (most recent work first).
+NOW = [
+    "CRI Plant Request System for the Coconut Research Institute",
+    "Raawa Studio: on-device Sinhala subtitles for creators",
+    "Ahanna v1: Sinhala speech-to-text, code-mixed English included",
+    "Sinhala TTS that finally gets the schwa right",
+]
+
+# Terminal "about me": (command, output) pairs, typed out in order.
+TERMINAL = [
+    ("whoami", "Thulnith Perera · CS undergrad, University of Westminster · Sri Lanka"),
+    ("cat focus.txt", "Sinhala voice AI  ·  desktop apps  ·  computer vision"),
+    ("ls ~/shipped", "AutoTyper   Easy-AI-Sub   antigravity-delegate   Clamp"),
+    ("echo $MOTTO", "Learn fast. Build hard. Improve constantly."),
+]
+
+# Journey timeline: (month the repo was started, title). Dates from the GitHub API.
+JOURNEY = [
+    ("Nov 2024", "Joined GitHub"),
+    ("Jun 2025", "CrowdEye"),
+    ("Mar 2026", "AutoTyper"),
+    ("May 2026", "Easy AI Sub"),
+    ("Jun 2026", "Clamp"),
+    ("Aug 2026", "antigravity-delegate"),
+    ("Sep 2026", "Sinhala TTS"),
+    ("Oct 2026", "Raawa · Ahanna"),
+    ("Nov 2026", "CRI system"),
+]
