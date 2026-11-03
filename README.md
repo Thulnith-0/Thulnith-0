@@ -1,9 +1,9 @@
 <!-- ===================================================== -->
-<!--                THULNITH-0 INSANE README               -->
+<!--             THULNITH-0  •  SUPER README               -->
 <!-- ===================================================== -->
 
 <p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&height=220&text=THULNITH%20PERERA&fontSize=42&fontAlignY=38&animation=fadeIn&fontColor=ffffff&color=0:0f172a,25:4c1d95,50:7c3aed,75:06b6d4,100:0ea5e9" width="100%" />
+  <img src="https://capsule-render.vercel.app/api?type=waving&height=260&section=header&text=THULNITH%20PERERA&fontSize=54&fontAlignY=40&desc=Builder%20%E2%80%A2%20Developer%20%E2%80%A2%20Tech%20Explorer&descSize=20&descAlignY=62&animation=twinkling&fontColor=ffffff&color=0:0f172a,25:4c1d95,50:7c3aed,75:06b6d4,100:0ea5e9" width="100%" />
 </p>
 
 <h1 align="center">Hi 👋 I'm Thulnith Perera</h1>
@@ -14,32 +14,46 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/Thulnith-0"><img src="https://img.shields.io/badge/GitHub-Thulnith--0-111827?style=for-the-badge&logo=github&logoColor=white" alt="GitHub" /></a>
   <img src="https://komarev.com/ghpvc/?username=Thulnith-0&label=Profile%20Views&color=8b5cf6&style=for-the-badge" alt="Profile Views" />
   <img src="https://img.shields.io/github/followers/Thulnith-0?style=for-the-badge&logo=github&label=Followers&color=7c3aed" alt="Followers" />
   <img src="https://img.shields.io/github/stars/Thulnith-0?style=for-the-badge&logo=github&label=Stars&color=06b6d4" alt="Stars" />
-  <img src="https://img.shields.io/badge/Focus-Building%20Insane%20Projects-0f172a?style=for-the-badge&logo=vercel&logoColor=white" alt="Focus" />
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/GitHub%20Joined-2024--11--30-4c1d95?style=for-the-badge&labelColor=111827" alt="Joined Date" />
-  <img src="https://img.shields.io/badge/Joined%20Timestamp-2024--11--30T14%3A57%3A06Z-7c3aed?style=for-the-badge&labelColor=111827" alt="Joined Timestamp" />
-  <img src="https://img.shields.io/badge/Profile%20Mode-Insane-06b6d4?style=for-the-badge&labelColor=111827" alt="Profile Mode" />
+  <img src="https://img.shields.io/badge/Profile%20Mode-Super-06b6d4?style=for-the-badge&labelColor=111827" alt="Profile Mode" />
+  <img src="https://img.shields.io/badge/Status-Building%20Something%20Big-7c3aed?style=for-the-badge&labelColor=111827" alt="Status" />
 </p>
 
----
+<div align="center">
+
+📅 GitHub Age: **1 year, 11 months, 4 days**
+
+</div>
+
+<p align="center">
+  <a href="#-about-me">About</a> •
+  <a href="#-current-focus">Focus</a> •
+  <a href="#-tech-stack">Stack</a> •
+  <a href="#-highlighted-projects">Projects</a> •
+  <a href="#-github-power-panel">Stats</a> •
+  <a href="#-roadmap">Roadmap</a> •
+  <a href="#-connect">Connect</a>
+</p>
 
 <img src="https://capsule-render.vercel.app/api?type=rect&color=gradient&customColorList=12,20,24,30&height=2&section=header" width="100%" />
 
 ## 🌌 About Me
 
 ```yaml
-Name: Thulnith Perera
+Name:     Thulnith Perera
 Username: Thulnith-0
-Role: Computer Science Student
-Focus: Web, AI, IoT, Desktop Apps, Real-World Solutions
-Style: Clean UI + Strong Logic + Big Vision
-Goal: Turn ideas into polished products
-Mindset: Learn fast. Build hard. Improve constantly.
+Role:     Computer Science Student
+Focus:    Web, AI, IoT, Desktop Apps, Real-World Solutions
+Style:    Clean UI + Strong Logic + Big Vision
+Goal:     Turn ideas into polished products
+Mindset:  Learn fast. Build hard. Improve constantly.
 ```
 
 <div align="center">
@@ -56,11 +70,15 @@ Mindset: Learn fast. Build hard. Improve constantly.
 
 ## 🔥 Current Focus
 
-- 🧠 Learning deeper than the syllabus
-- 🚀 Building serious and useful projects
-- 🚌 Working on transport and smart-system ideas like **CrowdEye**
-- 💻 Improving my GitHub, portfolio, and overall developer level
-- 🎯 Trying to make every project cleaner, smarter, and more impressive
+<table>
+  <tr>
+    <td align="center" width="20%">🧠<br /><b>Go Deeper</b><br /><sub>Learning beyond the syllabus</sub></td>
+    <td align="center" width="20%">🚀<br /><b>Ship Real Things</b><br /><sub>Serious, useful projects</sub></td>
+    <td align="center" width="20%">🚌<br /><b>Smart Transport</b><br /><sub>Systems like <b>CrowdEye</b></sub></td>
+    <td align="center" width="20%">💻<br /><b>Level Up</b><br /><sub>GitHub, portfolio, craft</sub></td>
+    <td align="center" width="20%">🎯<br /><b>Polish</b><br /><sub>Cleaner, smarter, sharper</sub></td>
+  </tr>
+</table>
 
 ---
 
@@ -79,7 +97,7 @@ Mindset: Learn fast. Build hard. Improve constantly.
 ## 🧰 Tech Stack
 
 <p align="center">
-  <img src="https://skillicons.dev/icons?i=java,python,cs,html,css,js,git,github,vscode,idea,visualstudio,windows,linux" />
+  <img src="https://skillicons.dev/icons?i=java,python,cs,html,css,js,git,github,vscode,idea,visualstudio,windows,linux&perline=13" />
 </p>
 
 ### Languages & Core Tools
@@ -99,6 +117,13 @@ Mindset: Learn fast. Build hard. Improve constantly.
   <img src="https://img.shields.io/badge/Visual%20Studio-111827?style=for-the-badge&logo=visualstudio&logoColor=8b5cf6" />
   <img src="https://img.shields.io/badge/Git-111827?style=for-the-badge&logo=git&logoColor=F05032" />
   <img src="https://img.shields.io/badge/GitHub-111827?style=for-the-badge&logo=github&logoColor=white" />
+  <img src="https://img.shields.io/badge/GitHub%20Actions-111827?style=for-the-badge&logo=githubactions&logoColor=2088FF" />
+</p>
+
+### Platforms
+<p align="center">
+  <img src="https://img.shields.io/badge/Windows-111827?style=for-the-badge&logo=windows&logoColor=0078D4" />
+  <img src="https://img.shields.io/badge/Linux-111827?style=for-the-badge&logo=linux&logoColor=FCC624" />
 </p>
 
 ---
@@ -107,16 +132,24 @@ Mindset: Learn fast. Build hard. Improve constantly.
 
 <table>
   <tr>
-    <td width="50%">
+    <td width="50%" valign="top">
       <h3 align="center">🚌 CrowdEye</h3>
       <p align="center">
         Smart public transport idea focused on crowd visibility, passenger intelligence, and real-world monitoring systems.
       </p>
+      <p align="center">
+        <img src="https://img.shields.io/badge/Domain-Smart%20Transport-7c3aed?style=flat-square&labelColor=111827" />
+        <img src="https://img.shields.io/badge/Type-IoT%20%2B%20Data-06b6d4?style=flat-square&labelColor=111827" />
+      </p>
     </td>
-    <td width="50%">
+    <td width="50%" valign="top">
       <h3 align="center">⌨️ AutoTyper</h3>
       <p align="center">
         Lightweight desktop automation tool focused on speed, simplicity, and practical usability.
+      </p>
+      <p align="center">
+        <img src="https://img.shields.io/badge/Domain-Automation-7c3aed?style=flat-square&labelColor=111827" />
+        <img src="https://img.shields.io/badge/Type-Desktop%20App-06b6d4?style=flat-square&labelColor=111827" />
       </p>
     </td>
   </tr>
@@ -167,6 +200,31 @@ Mindset: Learn fast. Build hard. Improve constantly.
 
 ---
 
+## 🗺️ Roadmap
+
+| Status | Goal |
+|:-:|---|
+| 🟢 | Keep this profile polished and automatically up to date |
+| 🟡 | Push **CrowdEye** from idea toward a working smart-transport system |
+| 🟡 | Keep improving **AutoTyper** — faster, simpler, more useful |
+| 🔵 | Go deeper into AI and IoT beyond the syllabus |
+| 🔵 | Publish more finished, well-documented projects |
+
+<sub>🟢 ongoing &nbsp;•&nbsp; 🟡 in progress &nbsp;•&nbsp; 🔵 next up</sub>
+
+---
+
+## 💬 Philosophy
+
+<div align="center">
+
+> **Learn fast. Build hard. Improve constantly.**
+> *Power and design — never one without the other.*
+
+</div>
+
+---
+
 ## 🎮 Extra Cool Stuff
 
 <p align="center">
@@ -189,6 +247,16 @@ Mindset: Learn fast. Build hard. Improve constantly.
   <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Thulnith-0/Thulnith-0/output/github-contribution-grid-snake.svg" />
   <img alt="github contribution snake" src="https://raw.githubusercontent.com/Thulnith-0/Thulnith-0/output/github-contribution-grid-snake.svg" />
 </picture>
+
+---
+
+## 🤝 Connect
+
+<p align="center">
+  <a href="https://github.com/Thulnith-0"><img src="https://img.shields.io/badge/Follow%20on%20GitHub-Thulnith--0-7c3aed?style=for-the-badge&logo=github&logoColor=white" alt="Follow on GitHub" /></a>
+</p>
+
+<p align="center"><i>Got an idea worth building? Open an issue or follow along — let's make something real. ⚡</i></p>
 
 <p align="center">
   <img src="https://capsule-render.vercel.app/api?type=waving&height=130&section=footer&color=0:0f172a,25:4c1d95,50:7c3aed,75:06b6d4,100:0ea5e9" width="100%" />
