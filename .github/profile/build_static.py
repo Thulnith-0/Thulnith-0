@@ -8,18 +8,15 @@ from __future__ import annotations
 from pathlib import Path
 
 import content as C
-from design import (MONO, W, chip, esc, google_dots, icon, panel, svg, text, text_width, wrap,
-                    write_pair)
+from design import (MONO, W, chip, esc, glint, google_dots, icon, panel, pulse, shifting_gradient, svg,
+                    text, text_width, wrap, write_pair)
 
 OUT = Path(__file__).resolve().parents[2] / "assets"
 
 
 def grad_def(t, gid="g", x2="1"):
     a, b = t["grad"]
-    return (
-        f'<linearGradient id="{gid}" x1="0" y1="0" x2="{x2}" y2="0">'
-        f'<stop offset="0" stop-color="{a}"/><stop offset="1" stop-color="{b}"/></linearGradient>'
-    )
+    return shifting_gradient(gid, a, b)
 
 
 # --------------------------------------------------------------------------- hero
@@ -99,22 +96,27 @@ SECTIONS = {
 def highlights(t, mode):
     n, gap, h = len(C.HIGHLIGHTS), 14, 176
     tw = (W - gap * (n - 1)) / n
-    body = []
+    body, defs, css = [], [grad_def(t, x2="1")], []
+    sheen, strength = ("#ffffff", 0.9) if mode == "light" else ("#ffffff", 0.07)
     for i, (big, l1, l2) in enumerate(C.HIGHLIGHTS):
         x = i * (tw + gap)
         size = 40 if text_width(big, 40, 700) < tw - 44 else 32
         fill = "url(#g)" if i == 0 else t["text"]
+        gd, gb, gc = glint(f"h{i}", x + 0.5, 0.5, tw - 1, h - 1, 20, sheen, strength, 2.2 + i * 0.35, 10)
+        defs.append(gd)
+        css.append(gc)
         body.append(
             f'<g class="f d{i + 1}">'
             f'<rect x="{x + 0.5:.1f}" y="0.5" width="{tw - 1:.1f}" height="{h - 1}" rx="20" '
             f'fill="{t["card"]}" stroke="{t["panel_line"]}"/>'
+            + gb
             + text(x + 24, 78, big, size, fill, 700, spacing=-1.4)
             + text(x + 24, 122, l1, 13.5, t["text2"], 500)
             + text(x + 24, 142, l2, 13.5, t["text2"], 500)
             + "</g>"
         )
     return svg(W, h, "".join(body), "Highlights: " + "; ".join(f"{a} {b} {c}" for a, b, c in C.HIGHLIGHTS),
-               defs=grad_def(t, x2="1"))
+               "".join(css), "".join(defs))
 
 
 # --------------------------------------------------------------------------- project cards
@@ -122,24 +124,28 @@ def highlights(t, mode):
 CARD_W, CARD_H = 433, 286
 
 
-def project(p):
+def project(p, idx=0):
     def render(t, mode):
         w, h, x = CARD_W, CARD_H, 28
+        sheen, strength = ("#ffffff", 0.9) if mode == "light" else ("#ffffff", 0.06)
+        gd, gb, gc = glint("p", 0.5, 0.5, w - 1, h - 1, 22, sheen, strength, 1.6 + (idx // 2) * 0.5 + (idx % 2) * 0.25, 11)
         body = [
             f'<rect x="0.5" y="0.5" width="{w - 1}" height="{h - 1}" rx="22" fill="{t["card"]}" stroke="{t["panel_line"]}"/>',
+            gb,
             f'<g class="f d1">{text(x, 44, p["area"].upper(), 11.5, t["accent"], 700, spacing=1.6)}</g>',
         ]
-        # status pill, top right
-        if p["kind"] == "public":
-            label, fill, col = "Public  ↗", t["text"], t["chip"] if mode == "light" else "#0d1117"
-        else:
-            label, fill, col = "Private", "none", t["text2"]
-        pw = text_width(label, 11.5, 600) + 24
-        stroke = t["text"] if p["kind"] == "public" else t["line"]
+        # status pill, top right; public ones get a Material-style live dot
+        public = p["kind"] == "public"
+        label = "Public  ↗" if public else "Private"
+        col = (t["chip"] if mode == "light" else "#0d1117") if public else t["text2"]
+        dot = 14 if public else 0
+        pw = text_width(label, 11.5, 600) + 24 + dot
+        px = w - x - pw
         body.append(
-            f'<g class="f d1"><rect x="{w - x - pw:.1f}" y="26" width="{pw:.1f}" height="26" rx="13" '
-            f'fill="{fill}" stroke="{stroke}"/>'
-            + text(w - x - pw / 2, 43.5, label, 11.5, col, 600, anchor="middle")
+            f'<g class="f d1"><rect x="{px:.1f}" y="26" width="{pw:.1f}" height="26" rx="13" '
+            f'fill="{t["text"] if public else "none"}" stroke="{t["text"] if public else t["line"]}"/>'
+            + (pulse(px + 15, 39, 3.2, "#34A853") if public else "")
+            + text(px + dot + (pw - dot) / 2, 43.5, label, 11.5, col, 600, anchor="middle")
             + "</g>"
         )
         title_size = 27 if text_width(p["name"], 27, 700) < w - 2 * x else 23
@@ -158,7 +164,7 @@ def project(p):
             chips.append(s)
             cx += cw + 8
         body.append(f'<g class="f d4">{"".join(chips)}</g>')
-        return svg(w, h, "".join(body), f'{p["name"]} ({p["kind"]}): {p["desc"]}')
+        return svg(w, h, "".join(body), f'{p["name"]} ({p["kind"]}): {p["desc"]}', gc, gd)
 
     return render
 
@@ -195,7 +201,7 @@ def stack(t, mode):
 # --------------------------------------------------------------------------- social buttons
 
 
-def social(item):
+def social(item, idx=0):
     ic, name, _handle, _url = item
 
     def render(t, mode):
@@ -208,7 +214,9 @@ def social(item):
             + icon(ic, pad, (h - size) / 2, size, fg)
             + text(pad + size + 8, h / 2 + fs * 0.36, name, fs, fg, 600)
         )
-        return svg(round(w), h, body, name)
+        sheen, strength = ("#ffffff", 0.35) if mode == "light" else (t["accent"], 0.28)
+        gd, gb, gc = glint("s", 0.5, 0.5, w - 1, h - 1, h / 2, sheen, strength, 2 + idx * 0.18, 8)
+        return svg(round(w), h, body + gb, name, gc, gd)
 
     return render
 
@@ -312,10 +320,10 @@ def main():
     write_pair(OUT, "footer", footer)
     for key, (eb, title) in SECTIONS.items():
         write_pair(OUT / "sections", key, section(eb, title))
-    for p in C.PROJECTS:
-        write_pair(OUT / "projects", p["slug"], project(p))
-    for s in C.SOCIALS:
-        write_pair(OUT / "social", s[0], social(s))
+    for i, p in enumerate(C.PROJECTS):
+        write_pair(OUT / "projects", p["slug"], project(p, i))
+    for i, s in enumerate(C.SOCIALS):
+        write_pair(OUT / "social", s[0], social(s, i))
     print(f"wrote static assets to {OUT}")
 
 

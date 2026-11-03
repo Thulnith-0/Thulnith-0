@@ -137,8 +137,54 @@ def icon(name: str, x: float, y: float, size: float, fill: str, opacity: float =
 
 
 def google_dots(x: float, y: float, r: float = 4, gap: float = 13) -> str:
+    """Google's four dots, doing a staggered bounce every few seconds."""
     return "".join(
-        f'<circle cx="{x + i * gap:.1f}" cy="{y:.1f}" r="{r}" fill="{c}"/>' for i, c in enumerate(GOOGLE)
+        f'<circle class="gd gd{i + 1}" cx="{x + i * gap:.1f}" cy="{y:.1f}" r="{r}" fill="{c}"/>'
+        for i, c in enumerate(GOOGLE)
+    )
+
+
+def pulse(cx: float, cy: float, r: float, color: str) -> str:
+    """A 'live' dot with an expanding ring, Material style."""
+    return (
+        f'<circle class="pl" cx="{cx:.1f}" cy="{cy:.1f}" r="{r}" fill="{color}" opacity="0"/>'
+        f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r}" fill="{color}"/>'
+    )
+
+
+def glint(uid: str, x: float, y: float, w: float, h: float, r: float, color: str, strength: float,
+          delay: float, period: float = 9.0):
+    """Apple-style light sweep across a rounded rect. Returns (defs, body, css).
+
+    The band starts off to the left and only moves while animating, so a viewer
+    that doesn't run animations simply never sees it."""
+    band = max(90.0, w * 0.32)
+    travel = w + band * 2
+    defs = (
+        f'<linearGradient id="gl{uid}" x1="0" y1="0" x2="1" y2="0.3">'
+        f'<stop offset="0" stop-color="{color}" stop-opacity="0"/>'
+        f'<stop offset=".5" stop-color="{color}" stop-opacity="{strength}"/>'
+        f'<stop offset="1" stop-color="{color}" stop-opacity="0"/></linearGradient>'
+        f'<clipPath id="gc{uid}"><rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{r}"/></clipPath>'
+    )
+    body = (
+        f'<g clip-path="url(#gc{uid})"><rect class="gl{uid}" x="{x - band:.1f}" y="{y - 2}" '
+        f'width="{band:.1f}" height="{h + 4}" fill="url(#gl{uid})"/></g>'
+    )
+    css = (
+        f".gl{uid}{{animation:sw{uid} {period}s cubic-bezier(.45,0,.2,1) {delay:.2f}s infinite}}"
+        f"@keyframes sw{uid}{{0%{{transform:translateX(0)}}30%,100%{{transform:translateX({travel:.0f}px)}}}}"
+    )
+    return defs, body, css
+
+
+def shifting_gradient(gid: str, a: str, b: str, dur: float = 6.0) -> str:
+    """Accent gradient that slides a -> b -> a continuously (Apple-Intelligence style)."""
+    return (
+        f'<linearGradient id="{gid}" x1="0" y1="0" x2="1" y2="0" spreadMethod="repeat">'
+        f'<stop offset="0" stop-color="{a}"/><stop offset=".5" stop-color="{b}"/><stop offset="1" stop-color="{a}"/>'
+        f'<animateTransform attributeName="gradientTransform" type="translate" '
+        f'from="0 0" to="1 0" dur="{dur}s" repeatCount="indefinite"/></linearGradient>'
     )
 
 
@@ -173,6 +219,11 @@ BASE_CSS = """
 .d1{animation-delay:.08s}.d2{animation-delay:.18s}.d3{animation-delay:.28s}
 .d4{animation-delay:.38s}.d5{animation-delay:.48s}.d6{animation-delay:.58s}
 @keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.gd{transform-box:fill-box;transform-origin:center;animation:gd 4.2s cubic-bezier(.3,0,.3,1) 1s infinite}
+.gd2{animation-delay:1.1s}.gd3{animation-delay:1.2s}.gd4{animation-delay:1.3s}
+@keyframes gd{0%,24%,100%{transform:none}8%{transform:translateY(-5px)}16%{transform:translateY(1px)}}
+.pl{transform-box:fill-box;transform-origin:center;animation:pl 2.4s cubic-bezier(.2,.6,.3,1) infinite}
+@keyframes pl{0%{transform:scale(1);opacity:.55}100%{transform:scale(3);opacity:0}}
 @media (prefers-reduced-motion: reduce){*{animation:none!important}}
 """
 

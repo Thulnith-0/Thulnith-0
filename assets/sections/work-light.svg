@@ -3,5 +3,10 @@
 .d1{animation-delay:.08s}.d2{animation-delay:.18s}.d3{animation-delay:.28s}
 .d4{animation-delay:.38s}.d5{animation-delay:.48s}.d6{animation-delay:.58s}
 @keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.gd{transform-box:fill-box;transform-origin:center;animation:gd 4.2s cubic-bezier(.3,0,.3,1) 1s infinite}
+.gd2{animation-delay:1.1s}.gd3{animation-delay:1.2s}.gd4{animation-delay:1.3s}
+@keyframes gd{0%,24%,100%{transform:none}8%{transform:translateY(-5px)}16%{transform:translateY(1px)}}
+.pl{transform-box:fill-box;transform-origin:center;animation:pl 2.4s cubic-bezier(.2,.6,.3,1) infinite}
+@keyframes pl{0%{transform:scale(1);opacity:.55}100%{transform:scale(3);opacity:0}}
 @media (prefers-reduced-motion: reduce){*{animation:none!important}}
 </style><defs></defs><g class="f d1"><text x="2.0" y="30.0" font-size="12.5" font-weight="700" fill="#0071e3" letter-spacing="2.2">SELECTED WORK</text></g><g class="f d2"><text x="0.0" y="76.0" font-size="40" font-weight="700" fill="#1d1d1f" letter-spacing="-1.2">Things I&#x27;ve built.</text></g></svg>
