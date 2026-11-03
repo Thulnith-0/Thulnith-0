@@ -20,6 +20,9 @@ from design import W, esc, panel, svg, text, text_width, write_pair
 
 API = "https://api.github.com/graphql"
 
+# Build/config files that aren't really "languages I write".
+IGNORED_LANGS = {"Batchfile", "Makefile", "Dockerfile", "Procfile", "CMake", "Inno Setup", "NSIS", "PowerShell"}
+
 # ------------------------------------------------------------------------------- data
 
 Q_PROFILE = """
@@ -97,6 +100,8 @@ def fetch(login: str, token: str) -> dict:
         if r["isFork"]:
             continue
         for e in r["languages"]["edges"]:
+            if e["node"]["name"] in IGNORED_LANGS:
+                continue
             langs[e["node"]["name"]] = langs.get(e["node"]["name"], 0) + e["size"]
 
     last_year = [v for k, v in days.items() if k > (now - timedelta(days=365)).date().isoformat()]
