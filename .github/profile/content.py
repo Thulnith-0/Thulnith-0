@@ -131,7 +131,7 @@ SOCIALS = [
     ("linkedin", "LinkedIn", "thulnith-perera", "https://www.linkedin.com/in/thulnith-perera-42b0bb346"),
     ("instagram", "Instagram", "@thulnith__", "https://www.instagram.com/thulnith__/"),
     ("tiktok", "TikTok", "@_thulnith_", "https://www.tiktok.com/@_thulnith_"),
-    ("facebook", "Facebook", "Thulnith Perera", "https://www.facebook.com/share/1F4tUva6wm/"),
+    ("facebook", "Facebook", "Thulnith Perera", "https://www.facebook.com/thulnith.perera.98/"),
     ("discord", "Discord", "Say hi", "https://discord.com/users/922739470837637241"),
     ("gmail", "Email", "thulnithperera870@gmail.com", "mailto:thulnithperera870@gmail.com"),
 ]
