@@ -1029,14 +1029,6 @@ def snake_card(d):
         period = play + pause
         f_end = play / period
 
-        max_len = final_len
-        L = max_len - 1  # hidden run-up so every segment starts on the path
-        pre = [(path[0][0] - k, path[0][1]) for k in range(L - 2, 0, -1)]  # off-board, left of the tail
-        cells_route = pre + path
-        S = len(cells_route) - 1  # number of equal steps
-        route_d = "M" + " L".join(f"{x:.1f},{y:.1f}" for x, y in (ctr(c) for c in cells_route))
-        head_idx0 = len(pre) + 2  # the head's index in cells_route at time 0
-
         def ktime(sec):
             return min(max(sec / period, 0.0), 1.0)
 
@@ -1065,49 +1057,61 @@ def snake_card(d):
                 )
             squares.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{cell:.1f}" height="{cell:.1f}" rx="6" fill="{shades[lv]}">{anim}</rect>')
 
-        # growth: segment i appears the moment the snake reaches length i + 1
-        grow_at = {}
-        length = 3
-        for k in sorted(eats):
-            grow_at[length] = (k - 2) * tick  # the new tail segment index == old length
-            length += 1
+        # ---- the body: one continuous rounded tube drawn along the head's exact path.
+        # It's the route stroked with a single dash from tail to head; per tick the head
+        # advances one square, and the tail advances too unless the snake just ate (the
+        # classic growth rule), so the dash stretches smoothly when it eats.
+        route_pts = [ctr(c) for c in path]
+        route_d = "M" + " L".join(f"{x:.1f},{y:.1f}" for x, y in route_pts)
+        S = len(path) - 1
+        big = S * pitch + 2000
+        eat_idx = sorted(eats)
+        lengths, length, j = [], 3, 0
+        for k in range(n_moves + 1):
+            while j < len(eat_idx) and eat_idx[j] <= k + 2:
+                length += 1
+                j += 1
+            lengths.append(length)
+        times = [ktime(k * tick) for k in range(n_moves + 1)] + [1.0]
+        dash_vals = [f"{(lengths[k] - 1) * pitch:.1f} {big:.0f}" for k in range(n_moves + 1)]
+        off_vals = [f"{-((k + 2) - (lengths[k] - 1)) * pitch:.1f}" for k in range(n_moves + 1)]
+        dash_vals.append(dash_vals[-1])
+        off_vals.append(off_vals[-1])
+        kts = ";".join(f"{x:.5f}" for x in times)
+        dash_anim = (f'<animate attributeName="stroke-dasharray" dur="{period:.2f}s" repeatCount="indefinite" '
+                     f'keyTimes="{kts}" values="{";".join(dash_vals)}"/>'
+                     f'<animate attributeName="stroke-dashoffset" dur="{period:.2f}s" repeatCount="indefinite" '
+                     f'keyTimes="{kts}" values="{";".join(off_vals)}"/>')
 
-        def mix(c1, c2, f):
-            c1, c2 = c1.lstrip("#"), c2.lstrip("#")
-            return "#" + "".join(f"{round(int(c1[k:k + 2], 16) * (1 - f) + int(c2[k:k + 2], 16) * f):02x}" for k in (0, 2, 4))
+        def tube(width, color, extra=""):
+            return (f'<use href="#route" fill="none" stroke="{color}" stroke-width="{width:.1f}" stroke-linecap="round" '
+                    f'stroke-linejoin="round" stroke-dasharray="{dash_vals[0]}" stroke-dashoffset="{off_vals[0]}"{extra}>'
+                    f'{dash_anim}</use>')
 
-        segs = []
-        for i in range(max_len - 1, -1, -1):  # tail first, head on top
-            si, ei = (head_idx0 - i) / S, (S - i) / S
-            motion = (f'<animateMotion dur="{period:.2f}s" repeatCount="indefinite" calcMode="linear" '
-                      f'keyPoints="{si:.5f};{ei:.5f};{ei:.5f}" keyTimes="0;{f_end:.5f};1" rotate="auto">'
-                      f'<mpath href="#route"/></animateMotion>')
-            if i == 0:
-                hs = pitch * 1.02
-                segs.append(
-                    f'<g>{motion}<rect x="{-hs / 2:.1f}" y="{-hs / 2:.1f}" width="{hs:.1f}" height="{hs:.1f}" rx="{hs * 0.36:.1f}" fill="{g_head}"/>'
-                    f'<circle cx="{hs * 0.16:.1f}" cy="{-hs * 0.2:.1f}" r="{hs * 0.13:.1f}" fill="#fff"/>'
-                    f'<circle cx="{hs * 0.16:.1f}" cy="{hs * 0.2:.1f}" r="{hs * 0.13:.1f}" fill="#fff"/>'
-                    f'<circle cx="{hs * 0.21:.1f}" cy="{-hs * 0.2:.1f}" r="{hs * 0.065:.1f}" fill="#0b0d11"/>'
-                    f'<circle cx="{hs * 0.21:.1f}" cy="{hs * 0.2:.1f}" r="{hs * 0.065:.1f}" fill="#0b0d11"/></g>'
-                )
-                continue
-            f = i / max(max_len - 1, 1)
-            bs = pitch * (1.0 - 0.18 * f)  # segments touch, so the body reads as one band
-            grow = ""
-            hidden = ""
-            if i >= 3:
-                tg = grow_at.get(i)
-                if tg is None:
-                    continue
-                g1 = ktime(tg)
-                grow = (f'<animate attributeName="opacity" dur="{period:.2f}s" repeatCount="indefinite" '
-                        f'keyTimes="0;{g1:.5f};{min(g1 + 0.004, 0.99):.5f};1" values="0;0;1;1"/>')
-                hidden = ' opacity="0"'
-            segs.append(
-                f'<g{hidden}>{motion}{grow}<rect x="{-bs / 2:.1f}" y="{-bs / 2:.1f}" width="{bs:.1f}" height="{bs:.1f}" '
-                f'rx="{bs * 0.28:.1f}" fill="{mix(g_head, g_tail, f)}"/></g>'
-            )
+        body_w = pitch * 0.74
+        shadow = tube(body_w + 6, "#000000", ' opacity=".22" transform="translate(0 3)"')
+        body_main = tube(body_w, g_head)
+        body_shine = tube(body_w * 0.26, "#ffffff", ' opacity=".14"')  # centred highlight: reads as a round tube
+
+        # head: rides the front of the tube and turns with it
+        f_head0, f_head1 = 2 / S, (n_moves + 2) / S
+        head_motion = (f'<animateMotion dur="{period:.2f}s" repeatCount="indefinite" calcMode="linear" '
+                       f'keyPoints="{f_head0:.5f};{f_head1:.5f};{f_head1:.5f}" keyTimes="0;{f_end:.5f};1" rotate="auto">'
+                       f'<mpath href="#route"/></animateMotion>')
+        hr = body_w * 0.62
+        tongue = (f'<path d="M{hr - 1:.1f},0 h{hr * 0.7:.1f} m0,0 l{hr * 0.28:.1f},-{hr * 0.22:.1f} m-{hr * 0.28:.1f},{hr * 0.22:.1f} '
+                  f'l{hr * 0.28:.1f},{hr * 0.22:.1f}" stroke="#ff4d5e" stroke-width="2" stroke-linecap="round" fill="none" opacity="0">'
+                  f'<animate attributeName="opacity" dur="2.6s" repeatCount="indefinite" keyTimes="0;.06;.12;.18;.24;1" values="0;1;0;1;0;0"/></path>')
+        head = (
+            f'<g>{head_motion}{tongue}'
+            f'<ellipse rx="{hr * 1.08:.1f}" ry="{hr:.1f}" fill="{g_head}"/>'
+            f'<ellipse cx="{-hr * 0.15:.1f}" cy="{-hr * 0.32:.1f}" rx="{hr * 0.55:.1f}" ry="{hr * 0.22:.1f}" fill="#ffffff" opacity=".22"/>'
+            f'<circle cx="{hr * 0.35:.1f}" cy="{-hr * 0.45:.1f}" r="{hr * 0.27:.1f}" fill="#fff"/>'
+            f'<circle cx="{hr * 0.35:.1f}" cy="{hr * 0.45:.1f}" r="{hr * 0.27:.1f}" fill="#fff"/>'
+            f'<circle cx="{hr * 0.45:.1f}" cy="{-hr * 0.45:.1f}" r="{hr * 0.14:.1f}" fill="#0b0d11"/>'
+            f'<circle cx="{hr * 0.45:.1f}" cy="{hr * 0.45:.1f}" r="{hr * 0.14:.1f}" fill="#0b0d11"/></g>'
+        )
+        segs = [shadow, body_main, body_shine, head]
         fade = (f'<animate attributeName="opacity" dur="{period:.2f}s" repeatCount="indefinite" '
                 f'keyTimes="0;{min(f_end + 0.012, 0.98):.5f};{min(f_end + 0.03, 0.99):.5f};1" values="1;1;0;0"/>')
         msg = {"clear": f"All clear · {len(eats)} eaten", "over": f"Game over · {len(eats)} eaten"}.get(
