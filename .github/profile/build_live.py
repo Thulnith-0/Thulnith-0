@@ -886,25 +886,35 @@ def play_snake(cols: int, rows: int, food: set, seed: int, max_ticks: int = 1100
     def inside(c):
         return 0 <= c[0] < cols and 0 <= c[1] < rows
 
-    def bfs(src, goals, blocked):
-        """Shortest path src -> any goal, avoiding blocked. Returns the list of cells after src."""
-        order = dirs[:]
-        rng.shuffle(order)
-        prev = {src: None}
-        q = deque([src])
-        while q:
-            cur = q.popleft()
+    def bfs(src, goals, blocked, heading=None):
+        """Shortest path src -> nearest goal avoiding blocked, and among equally short
+        paths the one with the fewest turns (players go straight, then turn; they don't
+        staircase). Dijkstra on (cell, direction) with cost (steps, turns)."""
+        import heapq
+        tie = rng.random
+        start_dir = heading
+        best = {}
+        heap = [(0, 0, tie(), src, start_dir)]
+        prev = {(src, start_dir): None}
+        while heap:
+            dist, turns, _, cur, dr = heapq.heappop(heap)
+            if best.get((cur, dr), (1 << 30, 0)) < (dist, turns):
+                continue
             if cur in goals and cur != src:
-                out = []
-                while cur != src:
-                    out.append(cur)
-                    cur = prev[cur]
+                out, state = [], (cur, dr)
+                while state[0] != src:
+                    out.append(state[0])
+                    state = prev[state]
                 return out[::-1]
-            for dx, dy in order:
-                n = (cur[0] + dx, cur[1] + dy)
-                if inside(n) and n not in prev and (n not in blocked or n in goals):
-                    prev[n] = cur
-                    q.append(n)
+            for d in dirs:
+                n = (cur[0] + d[0], cur[1] + d[1])
+                if not inside(n) or (n in blocked and n not in goals):
+                    continue
+                cost = (dist + 1, turns + (dr is not None and d != dr))
+                if cost < best.get((n, d), (1 << 30, 0)):
+                    best[(n, d)] = cost
+                    prev[(n, d)] = (cur, dr)
+                    heapq.heappush(heap, (cost[0], cost[1], tie(), n, d))
         return None
 
     def area(src, blocked):
@@ -939,13 +949,14 @@ def play_snake(cols: int, rows: int, food: set, seed: int, max_ticks: int = 1100
         head = body[0]
         blocked = set(list(body)[:-1])  # the tail square frees up as we move
         step = None
-        route = bfs(head, food, blocked)
+        heading = (head[0] - body[1][0], head[1] - body[1][1])
+        route = bfs(head, food, blocked, heading)
         if route and (safe_after(route) or chasing > cols * rows // 2):
             step = route[0]
             chasing = 0
         else:
             chasing += 1
-            to_tail = bfs(head, {body[-1]}, blocked) if len(body) > 3 else None
+            to_tail = bfs(head, {body[-1]}, blocked, heading) if len(body) > 3 else None
             if to_tail:
                 step = to_tail[0]
             else:
