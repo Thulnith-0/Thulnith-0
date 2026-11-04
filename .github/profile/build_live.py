@@ -635,25 +635,27 @@ LOCK = "M-3.5,-1 v-1.6 a3.5,3.5 0 0 1 7,0 v1.6 M-4.6,-1 h9.2 a1,1 0 0 1 1,1 v5.2
 def repos_card(d):
     """Every repository with commits in the last 12 months, by name, in two columns.
     Private repos keep their code private; their activity is shown, marked with a lock."""
-    rows = [(safe_name(n), c, priv) for n, c, priv in d["by_repo"] if not is_hidden(n)]
-    hidden = [(n, c) for n, c, _ in d["by_repo"] if is_hidden(n)]
-    if hidden:
-        rows.append((f"{len(hidden)} hidden repos", sum(c for _, c in hidden), True))
-    total = sum(c for _, c, _ in rows)
-    n_priv = sum(1 for *_, p in rows if p)
+    TOP = 10
+    shown_all = sorted(((safe_name(n), c, priv) for n, c, priv in d["by_repo"] if not is_hidden(n)),
+                       key=lambda r: -r[1])
+    rows = shown_all[:TOP]  # top repos by commits; re-ranked on every build
+    rest = shown_all[TOP:] + [(n, c, True) for n, c, _ in d["by_repo"] if is_hidden(n)]
+    rest_n, rest_c = len(rest), sum(c for _, c, _ in rest)
+    total = sum(c for _, c, _ in shown_all) + sum(c for n, c, _ in d["by_repo"] if is_hidden(n))
+    n_repos = len(d["by_repo"])
 
     def render(t, mode):
         x0, top, rh, gap = 28, 84, 34, 28
         cols = 2
         per = -(-len(rows) // cols) if rows else 1
         cw = (W - 2 * x0 - gap) / cols
-        h = top + per * rh + 46
+        h = top + per * rh + 70
         peak = max([c for _, c, _ in rows] or [1])
         css = (".rb{transform-box:fill-box;transform-origin:left center;animation:rb 1s cubic-bezier(.2,.8,.2,1) backwards}"
                "@keyframes rb{from{transform:scaleX(0)}}")
         body = [
-            f'<g class="f d1">{text(x0, 44, "EVERY REPOSITORY · LAST 12 MONTHS", 11.5, t["accent"], 700, spacing=1.6)}</g>',
-            f'<g class="f d1">{text(W - x0, 44, f"{len(rows)} repos · {total:,} commits", 13, t["text2"], 500, anchor="end")}</g>',
+            f'<g class="f d1">{text(x0, 44, "TOP REPOSITORIES · LAST 12 MONTHS", 11.5, t["accent"], 700, spacing=1.6)}</g>',
+            f'<g class="f d1">{text(W - x0, 44, f"{n_repos} repos · {total:,} commits", 13, t["text2"], 500, anchor="end")}</g>',
         ]
         for i, (name, c, priv) in enumerate(rows):
             col, row = divmod(i, per)
@@ -678,9 +680,13 @@ def repos_card(d):
                 + f'<rect class="rb" style="animation-delay:{delay + 0.05:.2f}s" x="{x:.1f}" y="{y + 7}" width="{bw:.1f}" '
                   f'height="5" rx="2.5" fill="{t["ramp"][min(i // 3, 3)]}"/>'
             )
-        foot = "Commits on default branches · lock = private repo: code is private, activity is shown"
+        if rest_n:
+            body.append(f'<g class="f" style="animation-delay:{0.3 + len(rows) * 0.035 + 0.1:.2f}s">'
+                        + text(x0, h - 44, f"+ {rest_n} more repos · {rest_c:,} commits", 13, t["text2"], 500) + "</g>")
+        foot = "Top 10 by commits on default branches, re-ranked every 12 hours · lock = private repo: code is private"
         body.append(text(x0, h - 20, foot, 11.5, t["text3"], 500))
-        title = f"Every repository: {len(rows)} repos, {total} commits, {n_priv} private. " + ", ".join(f"{n} {c}" for n, c, _ in rows)
+        title = (f"Top repositories by commits: " + ", ".join(f"{n} {c}" for n, c, _ in rows)
+                 + (f"; plus {rest_n} more repos with {rest_c} commits" if rest_n else ""))
         return svg(W, h, panel(t, W, h, r=22) + "".join(body), title, css)
 
     return render

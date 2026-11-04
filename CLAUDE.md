@@ -13,6 +13,8 @@ This repo is Thulnith's GitHub profile (`README.md` renders on github.com/Thulni
   owner's explicit hide list, `content.HIDDEN_REPOS` (Carbonware_Website, md,
   MD_Preview, challenge_1): those names stay off the profile and their commits show
   only as a total.
+- **Repo lists show the top repos by commits** (top 7 in "Contributed to", top 10 in
+  "Top repositories"), re-ranked on every build; the rest are a "+ N more" total.
 - **Never show the student ID** (e.g. `w2120618`, `20232673`, or the IIT email). Strip
   it from any displayed repo name (`content.STUDENT_ID_PATTERNS`).
 - **Count Claude's commits as the owner's.** Commits authored by Claude Code
