@@ -50,9 +50,7 @@ Q_PROFILE = "query($login: String!, $after: String) { user(login: $login) {" + P
 Q_VIEWER = "query($after: String) { viewer {" + PROFILE_FIELDS + "} }"
 Q_WHOAMI = "query { viewer { login } }"
 
-Q_MIX = """
-query($login: String!) {
-  user(login: $login) {
+MIX_FIELDS = """
     contributionsCollection {
       totalCommitContributions
       totalIssueContributions
@@ -63,8 +61,10 @@ query($login: String!) {
         repository { name }
       }
     }
-  }
-}"""
+"""
+# Private-repo contributions are only itemised for the owner's own token, via viewer.
+Q_MIX = "query($login: String!) { user(login: $login) {" + MIX_FIELDS + "} }"
+Q_MIX_VIEWER = "query { viewer {" + MIX_FIELDS + "} }"
 
 Q_YEAR = """
 query($login: String!, $from: DateTime!, $to: DateTime!) {
@@ -134,7 +134,11 @@ def fetch(login: str, token: str) -> dict:
                 continue
             langs[e["node"]["name"]] = langs.get(e["node"]["name"], 0) + e["size"]
 
-    mix = gql(Q_MIX, {"login": login}, token)["user"]["contributionsCollection"]
+    if as_owner:
+        mix = gql(Q_MIX_VIEWER, {}, token)["viewer"]["contributionsCollection"]
+    else:
+        mix = gql(Q_MIX, {"login": login}, token)["user"]["contributionsCollection"]
+    print(f"contributions itemised across {len(mix['commitContributionsByRepository'])} repos")
     by_repo = [(r["repository"]["name"], r["contributions"]["totalCount"])
                for r in mix["commitContributionsByRepository"]]
 
