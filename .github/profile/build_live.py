@@ -37,6 +37,8 @@ PROFILE_FIELDS = """
       totalCount
       pageInfo { hasNextPage endCursor }
       nodes {
+        name
+        owner { login }
         isFork
         isPrivate
         stargazerCount
@@ -78,7 +80,7 @@ query($login: String!, $from: DateTime!, $to: DateTime!) {
 }"""
 
 
-def gql(query: str, variables: dict, token: str) -> dict:
+def gql(query: str, variables: dict, token: str, allow_errors: bool = False) -> dict:
     req = urllib.request.Request(
         API,
         data=json.dumps({"query": query, "variables": variables}).encode(),
@@ -86,9 +88,35 @@ def gql(query: str, variables: dict, token: str) -> dict:
     )
     with urllib.request.urlopen(req, timeout=60) as r:
         payload = json.load(r)
-    if payload.get("errors"):
+    if payload.get("errors") and not (allow_errors and payload.get("data")):
         raise RuntimeError(payload["errors"])
     return payload["data"]
+
+
+def commits_per_repo(repos: list, since: datetime, token: str) -> dict[str, int]:
+    """Commits by the token owner on each repo's default branch since `since`."""
+    uid = gql("query { viewer { id } }", {}, token)["viewer"]["id"]
+    out: dict[str, int] = {}
+    for i in range(0, len(repos), 20):
+        chunk = repos[i:i + 20]
+        parts = []
+        for j, r in enumerate(chunk):
+            parts.append(
+                f'r{j}: repository(owner: {json.dumps(r["owner"]["login"])}, name: {json.dumps(r["name"])}) {{'
+                ' defaultBranchRef { target { ... on Commit {'
+                ' history(since: $since, author: {id: $uid}) { totalCount } } } } }'
+            )
+        q = "query($since: GitTimestamp!, $uid: ID!) {" + " ".join(parts) + "}"
+        try:  # one bad repo (empty, no access) shouldn't sink the whole build
+            data = gql(q, {"since": since.isoformat(), "uid": uid}, token, allow_errors=True) or {}
+        except Exception as e:
+            print(f"commit counts skipped for {len(chunk)} repos: {e}")
+            continue
+        for j, r in enumerate(chunk):
+            ref = (data.get(f"r{j}") or {}).get("defaultBranchRef")
+            if ref and ref.get("target") and "history" in ref["target"]:
+                out[r["name"]] = ref["target"]["history"]["totalCount"]
+    return out
 
 
 def fetch(login: str, token: str) -> dict:
@@ -139,8 +167,16 @@ def fetch(login: str, token: str) -> dict:
     else:
         mix = gql(Q_MIX, {"login": login}, token)["user"]["contributionsCollection"]
     print(f"contributions itemised across {len(mix['commitContributionsByRepository'])} repos")
-    by_repo = [(r["repository"]["name"], r["contributions"]["totalCount"])
-               for r in mix["commitContributionsByRepository"]]
+    counts: dict[str, int] = {}
+    for r in mix["commitContributionsByRepository"]:
+        counts[r["repository"]["name"]] = r["contributions"]["totalCount"]
+    if as_owner:
+        # GitHub won't itemise private-repo contributions for fine-grained tokens,
+        # so count the owner's commits on each repo's default branch directly.
+        for name, n in commits_per_repo(repos, now - timedelta(days=365), token).items():
+            counts[name] = max(counts.get(name, 0), n)
+    by_repo = sorted(((k, v) for k, v in counts.items() if v), key=lambda kv: -kv[1])
+    print(f"commits counted across {len(by_repo)} repos")
 
     last_year = [v for k, v in days.items() if k > (now - timedelta(days=365)).date().isoformat()]
     return {
