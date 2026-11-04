@@ -62,7 +62,7 @@ MIX_FIELDS = """
       totalPullRequestReviewContributions
       commitContributionsByRepository(maxRepositories: 50) {
         contributions { totalCount }
-        repository { name }
+        repository { name isPrivate }
       }
     }
 """
@@ -181,14 +181,16 @@ def fetch(login: str, token: str) -> dict:
         mix = gql(Q_MIX, {"login": login}, token)["user"]["contributionsCollection"]
     print(f"contributions itemised across {len(mix['commitContributionsByRepository'])} repos")
     counts: dict[str, int] = {}
+    private = {r["name"]: r["isPrivate"] for r in repos}
     for r in mix["commitContributionsByRepository"]:
         counts[r["repository"]["name"]] = r["contributions"]["totalCount"]
+        private.setdefault(r["repository"]["name"], r["repository"]["isPrivate"])
     if as_owner:
         # GitHub won't itemise private-repo contributions for fine-grained tokens,
         # so count the owner's commits on each repo's default branch directly.
         for name, n in commits_per_repo(repos, now - timedelta(days=365), token).items():
             counts[name] = max(counts.get(name, 0), n)
-    by_repo = sorted(((k, v) for k, v in counts.items() if v), key=lambda kv: -kv[1])
+    by_repo = sorted(((k, v, private.get(k, False)) for k, v in counts.items() if v), key=lambda kv: -kv[1])
     print(f"commits counted across {len(by_repo)} repos")
 
     last_year = [v for k, v in days.items() if k > (now - timedelta(days=365)).date().isoformat()]
@@ -236,9 +238,11 @@ def sample() -> dict:
         "days": days,
         "year_total": sum(v for k, v in days.items() if k > (today - timedelta(days=365)).isoformat()),
         "mix": {"Commits": 780, "Pull requests": 128, "Code review": 9, "Issues": 4},
-        "by_repo": [("Mint", 240), ("cri-plant-distribution-system", 160), ("Sinhala-TTS", 120),
-                    ("raawa-studio", 90), ("Clamp_PC", 70), ("crowdeye-iot-console", 40),
-                    ("w2120618-20232673-CSA-CW", 12), ("AutoTyper", 30)],
+        "by_repo": [("Mint", 240, True), ("cri-plant-distribution-system", 160, True), ("Sinhala-TTS", 120, True),
+                    ("raawa-studio", 90, True), ("Clamp_PC", 70, True), ("crowdeye-iot-console", 40, True),
+                    ("AutoTyper", 30, False), ("w2120618-20232673-CSA-CW", 12, False), ("Mint_Android", 25, True),
+                    ("Carbonware_Website", 18, True), ("Easy-AI-Sub", 9, False), ("MD_Preview", 6, True),
+                    ("Traffic-Flow-Analyzer-4COSC001W-Software-Development-I-Coursework-2024-", 4, False)],
     }
 
 
@@ -495,19 +499,41 @@ def heatmap_card(d):
     return render
 
 
-def grouped_repos(by_repo):
-    """Collapse repo names into the allowed display names; the rest become 'Other repos'."""
-    groups: dict[str, int] = {}
-    other, other_n = 0, 0
-    for name, n in by_repo:
-        shown = C.REPO_NAMES.get(name.lower())
-        if shown:
-            groups[shown] = groups.get(shown, 0) + n
-        else:
-            other += n
-            other_n += 1
-    return sorted(groups.items(), key=lambda kv: -kv[1]), other, other_n
+def clean_name(name: str) -> str:
+    """A repo's display name: content.REPO_NAMES if listed, else its own name with any
+    student ID removed (never shown)."""
+    shown = C.REPO_NAMES.get(name.lower())
+    if shown:
+        return shown
+    return safe_name(name)
 
+
+def safe_name(name: str) -> str:
+    """A repo's own name with any student ID removed."""
+    out = name
+    for pat in C.STUDENT_ID_PATTERNS:
+        out = re.sub(pat, "", out)
+    out = re.sub(r"[-_]{2,}", "-", out).strip("-_ ")
+    return out or "Coursework"
+
+
+def is_hidden(name: str) -> bool:
+    return name.lower() in C.HIDDEN_REPOS
+
+
+def grouped_repos(by_repo):
+    """Repos under their display names; repos that share a name are summed (e.g. Mint).
+    Hidden repos (content.HIDDEN_REPOS) are only counted as a total."""
+    groups: dict[str, int] = {}
+    hidden, hidden_n = 0, 0
+    for name, n, *_ in by_repo:
+        if is_hidden(name):
+            hidden += n
+            hidden_n += 1
+            continue
+        shown = clean_name(name)
+        groups[shown] = groups.get(shown, 0) + n
+    return sorted(groups.items(), key=lambda kv: -kv[1]), hidden, hidden_n
 
 def overview_card(d):
     mix = d["mix"]
@@ -599,6 +625,63 @@ def overview_card(d):
         title = ("Activity overview: " + ", ".join(f"{k} {round(pct[k] * 100)}%" for k, _, _ in axes)
                  + ". Contributed to " + ", ".join(n for n, _ in top))
         return svg(W, h, panel(t, W, h, r=22) + "".join(body), title, css, defs)
+
+    return render
+
+
+LOCK = "M-3.5,-1 v-1.6 a3.5,3.5 0 0 1 7,0 v1.6 M-4.6,-1 h9.2 a1,1 0 0 1 1,1 v5.2 a1,1 0 0 1 -1,1 h-9.2 a1,1 0 0 1 -1,-1 v-5.2 a1,1 0 0 1 1,-1 z"
+
+
+def repos_card(d):
+    """Every repository with commits in the last 12 months, by name, in two columns.
+    Private repos keep their code private; their activity is shown, marked with a lock."""
+    rows = [(safe_name(n), c, priv) for n, c, priv in d["by_repo"] if not is_hidden(n)]
+    hidden = [(n, c) for n, c, _ in d["by_repo"] if is_hidden(n)]
+    if hidden:
+        rows.append((f"{len(hidden)} hidden repos", sum(c for _, c in hidden), True))
+    total = sum(c for _, c, _ in rows)
+    n_priv = sum(1 for *_, p in rows if p)
+
+    def render(t, mode):
+        x0, top, rh, gap = 28, 84, 34, 28
+        cols = 2
+        per = -(-len(rows) // cols) if rows else 1
+        cw = (W - 2 * x0 - gap) / cols
+        h = top + per * rh + 46
+        peak = max([c for _, c, _ in rows] or [1])
+        css = (".rb{transform-box:fill-box;transform-origin:left center;animation:rb 1s cubic-bezier(.2,.8,.2,1) backwards}"
+               "@keyframes rb{from{transform:scaleX(0)}}")
+        body = [
+            f'<g class="f d1">{text(x0, 44, "EVERY REPOSITORY · LAST 12 MONTHS", 11.5, t["accent"], 700, spacing=1.6)}</g>',
+            f'<g class="f d1">{text(W - x0, 44, f"{len(rows)} repos · {total:,} commits", 13, t["text2"], 500, anchor="end")}</g>',
+        ]
+        for i, (name, c, priv) in enumerate(rows):
+            col, row = divmod(i, per)
+            x = x0 + col * (cw + gap)
+            y = top + row * rh
+            delay = 0.3 + i * 0.035
+            nx = x + (16 if priv else 0)
+            max_w = cw - 70 - (16 if priv else 0)
+            label = name
+            while text_width(label, 13, 600) > max_w and len(label) > 4:
+                label = label[:-2]
+            if label != name:
+                label = label.rstrip("-_ ") + "…"
+            lock = (f'<path transform="translate({x + 6:.1f} {y - 5:.1f}) scale(.95)" d="{LOCK}" fill="none" '
+                    f'stroke="{t["text3"]}" stroke-width="1.4" stroke-linecap="round"/>') if priv else ""
+            bw = max(4.0, (cw - 50) * c / peak)
+            body.append(
+                f'<g class="f" style="animation-delay:{delay:.2f}s">{lock}'
+                + text(nx, y, label, 13, t["text"], 600)
+                + text(x + cw, y, f"{c:,}", 13, t["text2"], 600, anchor="end")
+                + "</g>"
+                + f'<rect class="rb" style="animation-delay:{delay + 0.05:.2f}s" x="{x:.1f}" y="{y + 7}" width="{bw:.1f}" '
+                  f'height="5" rx="2.5" fill="{t["ramp"][min(i // 3, 3)]}"/>'
+            )
+        foot = "Commits on default branches · lock = private repo: code is private, activity is shown"
+        body.append(text(x0, h - 20, foot, 11.5, t["text3"], 500))
+        title = f"Every repository: {len(rows)} repos, {total} commits, {n_priv} private. " + ", ".join(f"{n} {c}" for n, c, _ in rows)
+        return svg(W, h, panel(t, W, h, r=22) + "".join(body), title, css)
 
     return render
 
@@ -1192,6 +1275,7 @@ def main():
         ("activity", activity_card),
         ("heatmap", heatmap_card),
         ("overview", overview_card),
+        ("repos", repos_card),
         ("rhythm", rhythm_card),
         ("snake", snake_card),
         ("achievements", achievements_card),
