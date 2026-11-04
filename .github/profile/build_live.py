@@ -96,30 +96,41 @@ def gql(query: str, variables: dict, token: str, allow_errors: bool = False) -> 
 
 
 def commits_per_repo(repos: list, since: datetime, token: str) -> dict[str, int]:
-    """Commits by the token owner on each repo's default branch since `since`."""
-    uid = gql("query { viewer { id } }", {}, token)["viewer"]["id"]
+    """Commits on each repo's default branch since `since` that are the owner's: authored by
+    the owner's account, or by an author in content.EXTRA_AUTHOR_EMAILS (Claude Code)."""
+    me = gql("query { viewer { login } }", {}, token)["viewer"]["login"].lower()
+    extra = {e.lower() for e in C.EXTRA_AUTHOR_EMAILS}
     out: dict[str, int] = {}
-    for i in range(0, len(repos), 20):
-        chunk = repos[i:i + 20]
-        parts = []
-        for j, r in enumerate(chunk):
-            parts.append(
-                f'r{j}: repository(owner: {json.dumps(r["owner"]["login"])}, name: {json.dumps(r["name"])}) {{'
-                ' defaultBranchRef { target { ... on Commit {'
-                ' history(since: $since, author: {id: $uid}) { totalCount } } } } }'
-            )
-        q = "query($since: GitTimestamp!, $uid: ID!) {" + " ".join(parts) + "}"
-        try:  # one bad repo (empty, no access) shouldn't sink the whole build
-            data = gql(q, {"since": since.isoformat(), "uid": uid}, token, allow_errors=True) or {}
-        except Exception as e:
-            print(f"commit counts skipped for {len(chunk)} repos: {e}")
+    q = """query($owner: String!, $name: String!, $since: GitTimestamp!, $after: String) {
+      repository(owner: $owner, name: $name) { defaultBranchRef { target { ... on Commit {
+        history(since: $since, first: 100, after: $after) {
+          pageInfo { hasNextPage endCursor }
+          nodes { author { email user { login } } }
+        } } } } } }"""
+    for r in repos:
+        n, after = 0, None
+        try:
+            for _ in range(50):  # at most 5,000 commits per repo
+                data = gql(q, {"owner": r["owner"]["login"], "name": r["name"], "since": since.isoformat(),
+                               "after": after}, token, allow_errors=True) or {}
+                ref = ((data.get("repository") or {}).get("defaultBranchRef") or {}).get("target") or {}
+                hist = ref.get("history")
+                if not hist:
+                    break
+                for c in hist["nodes"]:
+                    a = c.get("author") or {}
+                    login = ((a.get("user") or {}).get("login") or "").lower()
+                    if login == me or (a.get("email") or "").lower() in extra:
+                        n += 1
+                if not hist["pageInfo"]["hasNextPage"]:
+                    break
+                after = hist["pageInfo"]["endCursor"]
+        except Exception as e:  # one bad repo shouldn't sink the whole build
+            print(f"commit count skipped for {r['name']}: {e}")
             continue
-        for j, r in enumerate(chunk):
-            ref = (data.get(f"r{j}") or {}).get("defaultBranchRef")
-            if ref and ref.get("target") and "history" in ref["target"]:
-                out[r["name"]] = ref["target"]["history"]["totalCount"]
+        if n:
+            out[r["name"]] = n
     return out
-
 
 def fetch(login: str, token: str) -> dict:
     try:

@@ -187,4 +187,16 @@ REPO_NAMES = {
     "firestack": "FireStack",
     "hydra-panel-0.2": "Hydra Panel",
     "thulnith-0": "This profile",
+    "mint": "Mint",
+    "mint_android": "Mint",
+    "mint_mobile": "Mint",
+    "mint-downloader": "Mint",
+    "mint-webhook-server": "Mint",
+    "mint_email_engine": "Mint",
+    "mint_the_aggregator": "Mint",
+    "database_system_and_the_mint_harvester": "Mint",
 }
+
+# Commit authors counted as the profile owner's own work, besides the owner's account:
+# commits made by Claude in Claude Code sessions.
+EXTRA_AUTHOR_EMAILS = {"noreply@anthropic.com"}
