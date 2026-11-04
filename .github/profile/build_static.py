@@ -451,11 +451,9 @@ def readme() -> str:
         f'<p align="center">{pic("rhythm", "Weekly rhythm", live=True)}</p>',
         f'<p align="center">{pic("activity", "Activity over the last 30 days", live=True)}</p>',
         f'<p align="center">{pic("languages", "Top languages", live=True)}</p>',
-        f'<p align="center">{pic("achievements", "Achievements", live=True)}</p>',
-        "<p align=\"center\"><picture>"
-        f'<source media="(prefers-color-scheme: dark)" srcset="{LIVE}/github-contribution-grid-snake-dark.svg">'
-        f'<img src="{LIVE}/github-contribution-grid-snake.svg" width="100%" alt="Contribution snake">'
-        "</picture></p>",
+        f'<p align="center">{pic("badges", "GitHub achievements", live=True)}</p>',
+        f'<p align="center">{pic("achievements", "Milestones", live=True)}</p>',
+f'<p align="center">{pic("snake", "Contribution snake", live=True)}</p>',
         f'<p align="center">{pic("joke", "Today’s dev joke", live=True)}</p>',
         "",
         "<br>",
