@@ -876,11 +876,19 @@ def play_snake(cols: int, rows: int, food: set, seed: int, max_ticks: int = 1100
     from collections import deque
 
     rng = random.Random(seed)
-    row = rng.randint(1, rows - 2)
+    food = set(food)
+    # start on a row whose first three squares are empty, so no square is hidden under the
+    # starting body; if every row is occupied there, those squares count as eaten at the start
+    candidate_rows = list(range(1, rows - 1))
+    rng.shuffle(candidate_rows)
+    row = next((r for r in candidate_rows if not {(0, r), (1, r), (2, r)} & food), candidate_rows[0])
     body = deque([(2, row), (1, row), (0, row)])  # head first
-    food = set(food) - set(body)
     path = list(reversed(body))  # every cell the head has occupied, oldest first
     eats = {}
+    for k, c in enumerate(path):
+        if c in food:
+            food.discard(c)
+            eats[k] = c
     dirs = [(1, 0), (0, 1), (-1, 0), (0, -1)]
 
     def inside(c):
@@ -1065,7 +1073,7 @@ def snake_card(d):
         route_d = "M" + " L".join(f"{x:.1f},{y:.1f}" for x, y in route_pts)
         S = len(path) - 1
         big = S * pitch + 2000
-        eat_idx = sorted(eats)
+        eat_idx = sorted(k for k in eats if k >= 3)  # squares under the starting body don't grow it
         lengths, length, j = [], 3, 0
         for k in range(n_moves + 1):
             while j < len(eat_idx) and eat_idx[j] <= k + 2:
