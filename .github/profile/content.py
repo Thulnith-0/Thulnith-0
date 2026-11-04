@@ -164,3 +164,27 @@ JOURNEY = [
     ("Oct 2026", "Raawa · Ahanna"),
     ("Nov 2026", "CRI system"),
 ]
+
+# Repos the "Contributed to" list may name, mapped to how they're shown.
+# Anything not listed here (other private work, coursework repos) is grouped
+# as "Other repos", so private project names and student IDs never appear.
+REPO_NAMES = {
+    "autotyper": "AutoTyper",
+    "easy-ai-sub": "Easy AI Sub",
+    "antigravity-delegate": "antigravity-delegate",
+    "crowdeye": "CrowdEye",
+    "crowdeye-iot-console": "CrowdEye",
+    "crowdeye-website": "CrowdEye",
+    "crowdeye-marketing-website": "CrowdEye",
+    "sinhala-tts": "Sinhala TTS",
+    "sinhala-stt": "Sinhala speech",
+    "sinhala-speech": "Sinhala speech",
+    "sinhala-speech-common": "Sinhala speech",
+    "raawa-studio": "Raawa Studio",
+    "cri-plant-distribution-system": "CRI Plant Request System",
+    "clamp_pc": "Clamp",
+    "clamp_mobile": "Clamp",
+    "firestack": "FireStack",
+    "hydra-panel-0.2": "Hydra Panel",
+    "thulnith-0": "This profile",
+}
