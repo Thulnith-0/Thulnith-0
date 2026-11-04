@@ -794,14 +794,14 @@ def badges_card(badges: list[dict]):
         col = (W - 2 * x0) / n if badges else W
         r = 52 if n <= 4 else 44
         css = [
-            ".bd{transform-box:fill-box;transform-origin:center;animation:bd .9s cubic-bezier(.3,1.5,.5,1) backwards}"
-            "@keyframes bd{from{transform:translateY(-26px) scale(.6);opacity:0}}",
-            ".fl{animation:fl 4.6s ease-in-out infinite}"
-            "@keyframes fl{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}",
-            ".tc{transform-box:fill-box;transform-origin:center;animation:tc .5s cubic-bezier(.3,1.8,.5,1) backwards}"
-            "@keyframes tc{from{transform:scale(0)}}",
-            ".sp{transform-box:fill-box;transform-origin:center;animation:sp 9s cubic-bezier(.45,0,.25,1) infinite}"
-            "@keyframes sp{0%,88%{transform:none}94%{transform:scaleX(-1)}100%{transform:scaleX(1)}}",
+            # calm entrance: fade and settle, no bounce
+            ".bd{transform-box:fill-box;transform-origin:center;animation:bd 1.1s cubic-bezier(.2,.7,.2,1) backwards}"
+            "@keyframes bd{from{transform:scale(.9);opacity:0}}",
+            # soft halo in the tier colour that slowly breathes
+            ".ha{transform-box:fill-box;transform-origin:center;animation:ha 4.8s ease-in-out infinite}"
+            "@keyframes ha{0%,100%{transform:scale(.97);opacity:.12}50%{transform:scale(1.05);opacity:.5}}",
+            ".tc{transform-box:fill-box;transform-origin:center;animation:tc .6s cubic-bezier(.2,.7,.2,1) backwards}"
+            "@keyframes tc{from{transform:scale(.6);opacity:0}}",
         ]
         defs, body = [], [f'<g class="f d1">{text(x0, 44, "GITHUB ACHIEVEMENTS", 11.5, t["accent"], 700, spacing=1.6)}</g>',
                           f'<g class="f d1">{text(W - x0, 44, f"{len(badges)} earned", 13, t["text2"], 500, anchor="end")}</g>']
@@ -810,12 +810,10 @@ def badges_card(badges: list[dict]):
         for i, b in enumerate(badges):
             cx, cy = x0 + col * i + col / 2, 140
             d = 0.25 + i * 0.16
-            # gentle float, each badge on its own phase
-            float_css = f"animation-delay:-{i * 1.15:.2f}s"
             ring = TIER_COLORS.get(b["tier"] or "", t["line"])
             defs.append(f'<clipPath id="bc{i}"><circle cx="{cx:.1f}" cy="{cy}" r="{r}"/></clipPath>')
             gd, gb, gc = glint(f"b{i}", cx - r, cy - r, 2 * r, 2 * r, r, "#ffffff", 0.55 if mode == "light" else 0.35,
-                               2.4 + i * 0.4, 7.5)
+                               2.6 + i * 0.5, 11)
             defs.append(gd)
             css.append(gc)
             if b["img"]:
@@ -840,10 +838,11 @@ def badges_card(badges: list[dict]):
                         + "</g>")
             tier_label = (b["tier"] or "").capitalize()
             body.append(
-                f'<g class="bd" style="animation-delay:{d:.2f}s"><g class="fl" style="{float_css}">'
-                f'<g class="sp" style="animation-delay:{3 + i * 1.6:.2f}s">'
+                f'<g class="bd" style="animation-delay:{d:.2f}s">'
+                f'<circle class="ha" style="animation-delay:-{i * 1.2:.2f}s" cx="{cx:.1f}" cy="{cy}" r="{r + 11}" '
+                f'fill="none" stroke="{ring if b["tier"] else t["accent"]}" stroke-width="6" opacity=".12"/>'
                 f'<circle cx="{cx:.1f}" cy="{cy}" r="{r + 5}" fill="{t["chip"]}" stroke="{ring}" stroke-width="2"/>'
-                + art + gb + "</g>" + chip + "</g></g>"
+                + art + gb + chip + "</g>"
                 + f'<g class="f" style="animation-delay:{d + 0.35:.2f}s">'
                 + text(cx, cy + r + 40, b["name"], 15, t["text"], 700, anchor="middle", spacing=-0.2)
                 + "".join(text(cx, cy + r + 60 + k * 16, ln, 11.5, t["text2"], 500, anchor="middle")
@@ -861,8 +860,11 @@ def badges_card(badges: list[dict]):
 
 
 def snake_card(d):
-    """A glowing gradient snake that slithers through the contribution grid, eating each
-    square as its head arrives; eaten squares grow back half a loop later."""
+    """Snake-game style: the snake hunts the nearest active square, eats anything it slides
+    over, grows as it eats, then leaves; the grid refills for the next round. The route is
+    seeded by the date, so each day's hunt is different."""
+    import random
+
     today = date.today()
     start = today - timedelta(days=52 * 7 + (today.weekday() + 1) % 7)
     days = [(start + timedelta(days=i)) for i in range((today - start).days + 1)]
@@ -873,105 +875,141 @@ def snake_card(d):
     def level(v):
         return 0 if v == 0 else 1 + sum(v > c for c in cuts)
 
+    weeks = (len(days) + 6) // 7
+    lit = {}
+    for i, (dt, v) in enumerate(zip(days, vals)):
+        if v:
+            lit[(i // 7, (dt.weekday() + 1) % 7)] = level(v)
+
+    rng = random.Random(today.toordinal())
+
+    # ---- plan the hunt on the grid (col, row); cols -1 and `weeks` are just off the grid
+    pos = (-1, rng.randint(1, 5))
+    steps = [pos]
+    remaining = set(lit)
+    eat_step = {}  # cell -> index in steps when the head reaches it
+    while remaining:
+        dists = sorted(remaining, key=lambda c: (abs(c[0] - pos[0]) + abs(c[1] - pos[1]), rng.random()))
+        target = rng.choice(dists[:2]) if len(dists) > 1 and rng.random() < 0.35 else dists[0]
+        horizontal_first = rng.random() < 0.5
+        legs = [(target[0], pos[1]), target] if horizontal_first else [(pos[0], target[1]), target]
+        for corner in legs:
+            while pos != corner:
+                dc = (corner[0] > pos[0]) - (corner[0] < pos[0])
+                dr = (corner[1] > pos[1]) - (corner[1] < pos[1])
+                pos = (pos[0] + dc, pos[1]) if dc else (pos[0], pos[1] + dr)
+                steps.append(pos)
+                if pos in remaining:
+                    remaining.discard(pos)
+                    eat_step[pos] = len(steps) - 1
+    # leave off the right edge on the current row
+    while pos[0] < weeks:
+        pos = (pos[0] + 1, pos[1])
+        steps.append(pos)
+
     def render(t, mode):
         cell, pitch = 12, 15.2
-        weeks = (len(days) + 6) // 7
         gw = (weeks - 1) * pitch + cell
         x0 = (W - gw) / 2
         y0 = 74
-        gh = 6 * pitch + cell
-        lane = y0 + gh + 22  # the snake's way home, under the grid
-        h = round(lane + 34)
+        h = round(y0 + 6 * pitch + cell + 36)
         a, b = t["grad"]
         shades = [t["track"]] + [f'{t["accent"]}{op}' for op in ("55", "88", "c4", "")]
 
-        def centre(col, row):
-            return x0 + col * pitch + cell / 2, y0 + row * pitch + cell / 2
+        def centre(c):
+            return x0 + c[0] * pitch + cell / 2, y0 + c[1] * pitch + cell / 2
 
-        # path: down column 0, up column 1, ... then back home along the lane
-        pts = []
-        for col in range(weeks):
-            rows = range(7) if col % 2 == 0 else range(6, -1, -1)
-            pts += [centre(col, r) for r in rows]
-        first, last = pts[0], pts[-1]
-        home = [(last[0] + pitch, last[1]), (last[0] + pitch, lane), (first[0] - pitch, lane),
-                (first[0] - pitch, first[1]), first]
-        entry = [(first[0] - pitch, lane), (first[0] - pitch, first[1])]
-        route = entry + pts + home[:3]  # ... back along the lane to where we started
-        seg = [((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5 for (x1, y1), (x2, y2) in zip(route, route[1:])]
-        total = sum(seg)
+        n_max, n_base, lag = 34, 9, 0.042
+        speed = max(110.0, min(230.0, (len(steps) * pitch) / 42))  # aim for a ~40-45 s round
+        tail_len = n_max * lag * speed
+        # run-up from far left so every trailing segment starts off-screen, and a run-out to the right
+        y_in, y_out = centre(steps[0])[1], centre(steps[-1])[1]
+        pre = [(-tail_len - 40, y_in)]
+        post = [(W + tail_len + 40, y_out)]
+        pts = pre + [centre(c) for c in steps] + post
         cum = [0.0]
-        for L in seg:
-            cum.append(cum[-1] + L)
-        speed = 140.0  # px per second (~45 s loop)
+        for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
+            cum.append(cum[-1] + abs(x2 - x1) + abs(y2 - y1))
+        total = cum[-1]
         period = total / speed
-        path_d = "M" + " L".join(f"{x:.1f},{y:.1f}" for x, y in route)
+        path_d = "M" + " L".join(f"{x:.1f},{y:.1f}" for x, y in pts)
 
-        n_seg, lag = 14, 0.05
-        lead = n_seg * lag  # head starts this far along, so no segment ever waits at the origin
+        def head_time(k):  # seconds until the head reaches steps[k]
+            return cum[k + len(pre)] / speed
 
-        css = [
-            f".ea{{transform-box:fill-box;transform-origin:center;animation:ea {period:.2f}s linear infinite}}"
-            f"@keyframes ea{{0%{{transform:scale(1.45);filter:brightness(1.8)}}"
-            f"{100 * 0.35 / period:.3f}%{{transform:scale(.2);opacity:0}}"
-            f"55%{{transform:scale(.2);opacity:0}}70%{{transform:none;opacity:1}}100%{{transform:none;opacity:1}}}}"
-        ]
+        meals = sorted(head_time(k) for k in eat_step.values())
+        grow_every = max(1, -(-len(meals) // (n_max - n_base)))
+        grow_times = meals[grow_every - 1::grow_every]
+
+        def kt(x):
+            return f"{min(max(x / period, 0.0), 1.0):.5f}"
+
         cells = []
-        idx = 0
-        order = {}
-        for col in range(weeks):
-            rows = range(7) if col % 2 == 0 else range(6, -1, -1)
-            for r in rows:
-                order[(col, r)] = idx
-                idx += 1
-        for i, (dt, v) in enumerate(zip(days, vals)):
-            col, row = i // 7, (dt.weekday() + 1) % 7
+        for (col, row), lv in lit.items():
             x, y = x0 + col * pitch, y0 + row * pitch
-            lv = level(v)
-            if lv:
-                t_head = (cum[order[(col, row)] + len(entry)] / speed - lead) % period
-                cells.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{cell}" height="{cell}" rx="3" fill="{shades[0]}"/>')
-                cells.append(f'<rect class="ea" style="animation-delay:{t_head:.2f}s" x="{x:.1f}" y="{y:.1f}" '
-                             f'width="{cell}" height="{cell}" rx="3" fill="{shades[lv]}"/>')
-            else:
-                cells.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{cell}" height="{cell}" rx="3" fill="{shades[0]}"/>')
-
-        defs = (
-            '<filter id="glow" x="-50%" y="-50%" width="200%" height="200%">'
-            '<feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
-            f'<path id="route" d="{path_d}"/>'
+            te = head_time(eat_step[(col, row)])
+            a1, a2 = te / period, min(te / period + 0.004, 0.97)
+            a0, a3 = max(a1 - 0.0004, 0.00001), min(a1 + 0.012, 0.98)  # burst starts exactly when eaten
+            cells.append(
+                f'<rect x="{x:.1f}" y="{y:.1f}" width="{cell}" height="{cell}" rx="3" fill="{shades[lv]}">'
+                f'<animate attributeName="opacity" dur="{period:.2f}s" repeatCount="indefinite" '
+                f'keyTimes="0;{a1:.5f};{a2:.5f};0.985;1" values="1;1;0;0;1"/></rect>'
+                f'<circle cx="{x + cell / 2:.1f}" cy="{y + cell / 2:.1f}" r="0" fill="none" stroke="{t["accent"]}" stroke-width="2" opacity="0">'
+                f'<animate attributeName="r" dur="{period:.2f}s" repeatCount="indefinite" '
+                f'keyTimes="0;{a0:.5f};{a1:.5f};{a3:.5f};1" values="0;0;3;13;13"/>'
+                f'<animate attributeName="opacity" dur="{period:.2f}s" repeatCount="indefinite" '
+                f'keyTimes="0;{a0:.5f};{a1:.5f};{a3:.5f};1" values="0;0;.9;0;0"/></circle>'
+            )
+        empties = "".join(
+            f'<rect x="{x0 + c * pitch:.1f}" y="{y0 + r * pitch:.1f}" width="{cell}" height="{cell}" rx="3" fill="{shades[0]}"/>'
+            for c in range(weeks) for r in range(7)
+            if c * 7 + r < len(days) or (c, r) in lit
         )
 
         def mix(c1, c2, f):
             c1, c2 = c1.lstrip("#"), c2.lstrip("#")
             return "#" + "".join(f"{round(int(c1[k:k + 2], 16) * (1 - f) + int(c2[k:k + 2], 16) * f):02x}" for k in (0, 2, 4))
 
-        body_parts = []
-        for i in range(n_seg - 1, -1, -1):  # draw the tail first so the head sits on top
-            f = i / (n_seg - 1)
-            r = 6.6 - 3.4 * f
-            begin = -(lead - i * lag)
-            col = mix(a, b, f)
-            body_parts.append(
-                f'<circle r="{r:.2f}" fill="{col}"><animateMotion dur="{period:.2f}s" repeatCount="indefinite" '
-                f'begin="{begin:.3f}s" rotate="auto"><mpath href="#route"/></animateMotion></circle>'
+        motion = f'dur="{period:.2f}s" repeatCount="indefinite"'
+        segs = []
+        for i in range(n_max - 1, 0, -1):  # tail first, so the head draws on top
+            f = i / (n_max - 1)
+            r = 5.6 - 2.6 * f
+            vis = ""
+            if i >= n_base:
+                k = i - n_base
+                if k < len(grow_times):
+                    g = grow_times[k]
+                    vis = (f'<animate attributeName="opacity" {motion} '
+                           f'keyTimes="0;{kt(g)};{kt(g + 0.25)};1" values="0;0;1;1"/>')
+                else:
+                    continue  # never grows this long
+            segs.append(
+                f'<circle r="{r:.2f}" fill="{mix(a, b, f)}"{" opacity=\"0\"" if vis else ""}>'
+                f'<animateMotion {motion} begin="{i * lag:.3f}s" rotate="auto"><mpath href="#route"/></animateMotion>{vis}</circle>'
             )
-        # a small highlight on the head
-        body_parts.append(
-            f'<circle r="2.2" fill="#ffffff" opacity=".85"><animateMotion dur="{period:.2f}s" repeatCount="indefinite" '
-            f'begin="{-lead:.3f}s"><mpath href="#route"/></animateMotion></circle>'
+        eye = "#ffffff"
+        head = (
+            f'<g><circle r="6.6" fill="{a}"/>'
+            f'<circle cx="2.4" cy="-2.7" r="1.35" fill="{eye}"/><circle cx="2.4" cy="2.7" r="1.35" fill="{eye}"/>'
+            f'<circle cx="2.9" cy="-2.7" r=".6" fill="#0b0d11"/><circle cx="2.9" cy="2.7" r=".6" fill="#0b0d11"/>'
+            f'<animateMotion {motion} rotate="auto"><mpath href="#route"/></animateMotion></g>'
         )
-        snake_g = f'<g filter="url(#glow)">{"".join(body_parts)}</g>'
-
-        eaten = sum(1 for v in vals if v)
+        defs = (
+            '<filter id="glow" x="-50%" y="-50%" width="200%" height="200%">'
+            '<feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
+            f'<path id="route" d="{path_d}"/>'
+            f'<clipPath id="card"><rect x="1" y="1" width="{W - 2}" height="{h - 2}" rx="21"/></clipPath>'
+        )
+        eaten = len(lit)
         body = (
             f'<g class="f d1">{text(28, 44, "CONTRIBUTION SNAKE", 11.5, t["accent"], 700, spacing=1.6)}</g>'
-            + f'<g class="f d1">{text(W - 28, 44, f"Eats {eaten} active days, then they grow back", 13, t["text2"], 500, anchor="end")}</g>'
-            + f'<line x1="{x0 - pitch:.1f}" y1="{lane}" x2="{x0 + gw + pitch:.1f}" y2="{lane}" stroke="{t["line"]}" stroke-dasharray="2 6" stroke-linecap="round"/>'
-            + "".join(cells) + snake_g
+            + f'<g class="f d1">{text(W - 28, 44, f"Hunting {eaten} active days · new route every day", 13, t["text2"], 500, anchor="end")}</g>'
+            + empties + "".join(cells)
+            + f'<g clip-path="url(#card)"><g filter="url(#glow)">{"".join(segs)}{head}</g></g>'
         )
-        return svg(W, h, panel(t, W, h, r=22) + body, f"Contribution snake eating {eaten} active days of the last year",
-                   "".join(css), defs)
+        return svg(W, h, panel(t, W, h, r=22) + body, f"Contribution snake hunting {eaten} active days of the last year",
+                   "", defs)
 
     return render
 
