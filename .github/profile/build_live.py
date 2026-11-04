@@ -37,6 +37,8 @@ PROFILE_FIELDS = """
       totalCount
       pageInfo { hasNextPage endCursor }
       nodes {
+        name
+        owner { login }
         isFork
         isPrivate
         stargazerCount
@@ -50,6 +52,22 @@ Q_PROFILE = "query($login: String!, $after: String) { user(login: $login) {" + P
 Q_VIEWER = "query($after: String) { viewer {" + PROFILE_FIELDS + "} }"
 Q_WHOAMI = "query { viewer { login } }"
 
+MIX_FIELDS = """
+    contributionsCollection {
+      totalCommitContributions
+      totalIssueContributions
+      totalPullRequestContributions
+      totalPullRequestReviewContributions
+      commitContributionsByRepository(maxRepositories: 50) {
+        contributions { totalCount }
+        repository { name }
+      }
+    }
+"""
+# Private-repo contributions are only itemised for the owner's own token, via viewer.
+Q_MIX = "query($login: String!) { user(login: $login) {" + MIX_FIELDS + "} }"
+Q_MIX_VIEWER = "query { viewer {" + MIX_FIELDS + "} }"
+
 Q_YEAR = """
 query($login: String!, $from: DateTime!, $to: DateTime!) {
   user(login: $login) {
@@ -62,7 +80,7 @@ query($login: String!, $from: DateTime!, $to: DateTime!) {
 }"""
 
 
-def gql(query: str, variables: dict, token: str) -> dict:
+def gql(query: str, variables: dict, token: str, allow_errors: bool = False) -> dict:
     req = urllib.request.Request(
         API,
         data=json.dumps({"query": query, "variables": variables}).encode(),
@@ -70,9 +88,35 @@ def gql(query: str, variables: dict, token: str) -> dict:
     )
     with urllib.request.urlopen(req, timeout=60) as r:
         payload = json.load(r)
-    if payload.get("errors"):
+    if payload.get("errors") and not (allow_errors and payload.get("data")):
         raise RuntimeError(payload["errors"])
     return payload["data"]
+
+
+def commits_per_repo(repos: list, since: datetime, token: str) -> dict[str, int]:
+    """Commits by the token owner on each repo's default branch since `since`."""
+    uid = gql("query { viewer { id } }", {}, token)["viewer"]["id"]
+    out: dict[str, int] = {}
+    for i in range(0, len(repos), 20):
+        chunk = repos[i:i + 20]
+        parts = []
+        for j, r in enumerate(chunk):
+            parts.append(
+                f'r{j}: repository(owner: {json.dumps(r["owner"]["login"])}, name: {json.dumps(r["name"])}) {{'
+                ' defaultBranchRef { target { ... on Commit {'
+                ' history(since: $since, author: {id: $uid}) { totalCount } } } } }'
+            )
+        q = "query($since: GitTimestamp!, $uid: ID!) {" + " ".join(parts) + "}"
+        try:  # one bad repo (empty, no access) shouldn't sink the whole build
+            data = gql(q, {"since": since.isoformat(), "uid": uid}, token, allow_errors=True) or {}
+        except Exception as e:
+            print(f"commit counts skipped for {len(chunk)} repos: {e}")
+            continue
+        for j, r in enumerate(chunk):
+            ref = (data.get(f"r{j}") or {}).get("defaultBranchRef")
+            if ref and ref.get("target") and "history" in ref["target"]:
+                out[r["name"]] = ref["target"]["history"]["totalCount"]
+    return out
 
 
 def fetch(login: str, token: str) -> dict:
@@ -118,8 +162,31 @@ def fetch(login: str, token: str) -> dict:
                 continue
             langs[e["node"]["name"]] = langs.get(e["node"]["name"], 0) + e["size"]
 
+    if as_owner:
+        mix = gql(Q_MIX_VIEWER, {}, token)["viewer"]["contributionsCollection"]
+    else:
+        mix = gql(Q_MIX, {"login": login}, token)["user"]["contributionsCollection"]
+    print(f"contributions itemised across {len(mix['commitContributionsByRepository'])} repos")
+    counts: dict[str, int] = {}
+    for r in mix["commitContributionsByRepository"]:
+        counts[r["repository"]["name"]] = r["contributions"]["totalCount"]
+    if as_owner:
+        # GitHub won't itemise private-repo contributions for fine-grained tokens,
+        # so count the owner's commits on each repo's default branch directly.
+        for name, n in commits_per_repo(repos, now - timedelta(days=365), token).items():
+            counts[name] = max(counts.get(name, 0), n)
+    by_repo = sorted(((k, v) for k, v in counts.items() if v), key=lambda kv: -kv[1])
+    print(f"commits counted across {len(by_repo)} repos")
+
     last_year = [v for k, v in days.items() if k > (now - timedelta(days=365)).date().isoformat()]
     return {
+        "mix": {
+            "Commits": mix["totalCommitContributions"],
+            "Pull requests": mix["totalPullRequestContributions"],
+            "Code review": mix["totalPullRequestReviewContributions"],
+            "Issues": mix["totalIssueContributions"],
+        },
+        "by_repo": by_repo,
         "created": created.date().isoformat(),
         "followers": u["followers"]["totalCount"],
         "prs": u["pullRequests"]["totalCount"],
@@ -155,6 +222,10 @@ def sample() -> dict:
                   "Java": 180_000, "HTML": 120_000, "CSS": 90_000, "Dart": 60_000, "Kotlin": 20_000},
         "days": days,
         "year_total": sum(v for k, v in days.items() if k > (today - timedelta(days=365)).isoformat()),
+        "mix": {"Commits": 780, "Pull requests": 128, "Code review": 9, "Issues": 4},
+        "by_repo": [("Mint", 240), ("cri-plant-distribution-system", 160), ("Sinhala-TTS", 120),
+                    ("raawa-studio", 90), ("Clamp_PC", 70), ("crowdeye-iot-console", 40),
+                    ("w2120618-20232673-CSA-CW", 12), ("AutoTyper", 30)],
     }
 
 
@@ -411,6 +482,171 @@ def heatmap_card(d):
     return render
 
 
+def grouped_repos(by_repo):
+    """Collapse repo names into the allowed display names; the rest become 'Other repos'."""
+    groups: dict[str, int] = {}
+    other, other_n = 0, 0
+    for name, n in by_repo:
+        shown = C.REPO_NAMES.get(name.lower())
+        if shown:
+            groups[shown] = groups.get(shown, 0) + n
+        else:
+            other += n
+            other_n += 1
+    return sorted(groups.items(), key=lambda kv: -kv[1]), other, other_n
+
+
+def overview_card(d):
+    mix = d["mix"]
+    total = sum(mix.values()) or 1
+    pct = {k: v / total for k, v in mix.items()}
+    groups, other, other_n = grouped_repos(d["by_repo"])
+
+    def render(t, mode):
+        h = 360
+        a, b = t["grad"]
+        cx, cy, R = 214, 196, 92
+        # axes: Code review (top), Issues (right), Pull requests (bottom), Commits (left), like GitHub
+        axes = [("Code review", 0, -1), ("Issues", 1, 0), ("Pull requests", 0, 1), ("Commits", -1, 0)]
+        grid = "".join(
+            f'<polygon points="{" ".join(f"{cx + dx * R * f:.1f},{cy + dy * R * f:.1f}" for _, dx, dy in axes)}" '
+            f'fill="none" stroke="{t["line"]}" stroke-dasharray="{"0" if f == 1 else "2 4"}"/>'
+            for f in (0.25, 0.5, 0.75, 1)
+        )
+        spokes = "".join(f'<line x1="{cx}" y1="{cy}" x2="{cx + dx * R}" y2="{cy + dy * R}" stroke="{t["line"]}"/>'
+                         for _, dx, dy in axes)
+        # keep tiny shares visible as a sliver, never as nothing
+        r = {k: R * max(pct[k], 0.04) for k, _, _ in axes}
+        pts = [(cx + dx * r[k], cy + dy * r[k]) for k, dx, dy in axes]
+        poly = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
+        defs = (
+            f'<linearGradient id="rf" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="{a}" stop-opacity=".38"/>'
+            f'<stop offset="1" stop-color="{b}" stop-opacity=".18"/></linearGradient>'
+            f'<linearGradient id="rs" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="{a}"/><stop offset="1" stop-color="{b}"/></linearGradient>'
+        )
+        css = (
+            f".rad{{transform-origin:{cx}px {cy}px;animation:rad 1.3s cubic-bezier(.3,1.45,.45,1) .35s backwards}}"
+            "@keyframes rad{from{transform:scale(0);opacity:0}}"
+            ".vx{transform-box:fill-box;transform-origin:center;animation:vx .5s cubic-bezier(.3,1.6,.5,1) backwards}"
+            "@keyframes vx{from{transform:scale(0)}}"
+            ".bar{transform-box:fill-box;transform-origin:left center;animation:bar 1.1s cubic-bezier(.2,.8,.2,1) backwards}"
+            "@keyframes bar{from{transform:scaleX(0)}}"
+        )
+        body = [
+            f'<g class="f d1">{text(28, 44, "ACTIVITY OVERVIEW · LAST 12 MONTHS", 11.5, t["accent"], 700, spacing=1.6)}</g>',
+            grid, spokes,
+            f'<g class="rad"><polygon points="{poly}" fill="url(#rf)" stroke="url(#rs)" stroke-width="2.5" stroke-linejoin="round"/></g>',
+        ]
+        for i, ((k, dx, dy), (x, y)) in enumerate(zip(axes, pts)):
+            body.append(f'<circle class="vx" style="animation-delay:{1.1 + i * 0.08:.2f}s" cx="{x:.1f}" cy="{y:.1f}" r="5" '
+                        f'fill="{t["panel"]}" stroke="{a}" stroke-width="2.5"/>')
+            lx, ly = cx + dx * (R + 18), cy + dy * (R + 18)
+            anchor = "middle" if dx == 0 else ("start" if dx > 0 else "end")
+            if dy < 0:
+                ly -= 20
+            elif dy > 0:
+                ly += 6
+            else:
+                ly -= 8
+            body.append(
+                f'<g class="f" style="animation-delay:{1.2 + i * 0.08:.2f}s">'
+                + text(lx, ly + 10, f"{round(pct[k] * 100)}%", 17, t["text"], 700, anchor=anchor, spacing=-0.4)
+                + text(lx, ly + 27, k, 12, t["text2"], 500, anchor=anchor)
+                + "</g>"
+            )
+        # divider + contributed-to list
+        dx0 = 446
+        body.append(f'<line x1="{dx0}" y1="70" x2="{dx0}" y2="{h - 34}" stroke="{t["line"]}"/>')
+        lx = dx0 + 34
+        body.append(f'<g class="f d2">{text(lx, 100, "Contributed to", 15, t["text"], 600)}</g>')
+        top = groups[:5]
+        rows = top  # 'other' is a footnote, so it can't dwarf the named bars
+        peak = max([n for _, n in rows] or [1])
+        bw = W - lx - 28 - 52
+        for i, (name, n) in enumerate(rows):
+            y = 134 + i * 31
+            w = max(4.0, bw * n / peak)
+            col = t["ramp"][min(i, 3)]
+            delay = 0.5 + i * 0.1
+            body.append(
+                f'<g class="f" style="animation-delay:{delay:.2f}s">'
+                + text(lx, y, name, 13, t["text"], 600)
+                + text(W - 28, y, f"{n:,}", 13, t["text2"], 600, anchor="end")
+                + "</g>"
+                + f'<rect class="bar" style="animation-delay:{delay + 0.05:.2f}s" x="{lx}" y="{y + 7}" width="{w:.1f}" height="6" rx="3" fill="{col}"/>'
+            )
+        if other:
+            body.append(f'<g class="f" style="animation-delay:{0.5 + len(rows) * 0.1:.2f}s">'
+                        + text(lx, 134 + len(rows) * 31 + 4, f"+ {other:,} commits across {other_n} other repos",
+                               13, t["text2"], 500) + "</g>")
+        body.append(text(lx, h - 30, "Commits on default branches, last 12 months", 11.5, t["text3"], 500))
+        title = ("Activity overview: " + ", ".join(f"{k} {round(pct[k] * 100)}%" for k, _, _ in axes)
+                 + ". Contributed to " + ", ".join(n for n, _ in top))
+        return svg(W, h, panel(t, W, h, r=22) + "".join(body), title, css, defs)
+
+    return render
+
+
+def rhythm_card(d):
+    today = date.today()
+    window = [(today - timedelta(days=i)) for i in range(364, -1, -1)]
+    by_wd = [0] * 7  # Mon..Sun
+    best_day, best_n = None, -1
+    for dt in window:
+        n = d["days"].get(dt.isoformat(), 0)
+        by_wd[dt.weekday()] += n
+        if n > best_n:
+            best_day, best_n = dt, n
+    names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    long_names = ["Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays", "Sundays"]
+    total = sum(by_wd) or 1
+    top = max(range(7), key=lambda i: by_wd[i])
+    weekend = (by_wd[5] + by_wd[6]) / total
+
+    def render(t, mode):
+        h, x0 = 280, 28
+        a, b = t["grad"]
+        defs = f'<linearGradient id="bg1" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="{a}"/><stop offset="1" stop-color="{b}"/></linearGradient>'
+        css = (".vb{transform-box:fill-box;transform-origin:center bottom;animation:vb 1s cubic-bezier(.25,1.35,.45,1) backwards}"
+               "@keyframes vb{from{transform:scaleY(0)}}")
+        base, maxh = 222, 132
+        gap = 12
+        bx0 = 446 + 34
+        cw = (W - 28 - bx0 - 6 * gap) / 7
+        peak = max(by_wd) or 1
+        body = [
+            f'<g class="f d1">{text(x0, 44, "WEEKLY RHYTHM", 11.5, t["accent"], 700, spacing=1.6)}</g>',
+            f'<g class="f d2">{text(x0 - 1, 104, long_names[top] + ".", 40, t["text"], 700, spacing=-1.4)}</g>',
+            f'<g class="f d2">{text(x0, 132, "My most active day of the week", 13.5, t["text2"], 500)}</g>',
+            f'<line x1="{x0}" y1="156" x2="{446 - 34}" y2="156" stroke="{t["line"]}"/>',
+            '<g class="f d3">'
+            + text(x0, 200, f"{round(weekend * 100)}%", 26, t["text"], 700, spacing=-0.8)
+            + text(x0, 224, "on weekends", 12.5, t["text2"], 500)
+            + text(x0 + 150, 200, f"{best_n}", 26, t["text"], 700, spacing=-0.8)
+            + text(x0 + 150, 224, "busiest day, " + best_day.strftime("%b %d"), 12.5, t["text2"], 500)
+            + "</g>",
+            f'<line x1="446" y1="70" x2="446" y2="{h - 34}" stroke="{t["line"]}"/>',
+            f'<line x1="{bx0 - 6}" y1="{base}" x2="{W - 28}" y2="{base}" stroke="{t["line"]}"/>',
+        ]
+        for i, v in enumerate(by_wd):
+            bh = max(3.0, maxh * v / peak)
+            x = bx0 + i * (cw + gap)
+            fill = "url(#bg1)" if i == top else t["track"]
+            body.append(
+                f'<rect class="vb" style="animation-delay:{0.4 + i * 0.07:.2f}s" x="{x:.1f}" y="{base - bh:.1f}" '
+                f'width="{cw}" height="{bh:.1f}" rx="8" fill="{fill}"/>'
+                + text(x + cw / 2, base + 22, names[i], 12, t["text"] if i == top else t["text2"], 600 if i == top else 500, anchor="middle")
+                + f'<g class="f" style="animation-delay:{0.9 + i * 0.07:.2f}s">'
+                + text(x + cw / 2, base - bh - 9, f"{round(100 * v / total)}%", 11.5, t["text2"], 600, anchor="middle")
+                + "</g>"
+            )
+        title = (f"Weekly rhythm: most active on {long_names[top]}; {round(weekend * 100)}% on weekends; "
+                 f"busiest day {best_n} contributions on {best_day.isoformat()}")
+        return svg(W, h, panel(t, W, h, r=22) + "".join(body), title, css, defs)
+
+    return render
+
+
 TIERS = [("Bronze", "#c08457"), ("Silver", "#9aa3ad"), ("Gold", "#d4a72c"), ("Platinum", None)]
 
 
@@ -509,6 +745,8 @@ def main():
         ("languages", languages_card),
         ("activity", activity_card),
         ("heatmap", heatmap_card),
+        ("overview", overview_card),
+        ("rhythm", rhythm_card),
         ("achievements", achievements_card),
         ("joke", thought_card),
     ]:
