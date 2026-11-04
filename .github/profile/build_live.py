@@ -96,30 +96,41 @@ def gql(query: str, variables: dict, token: str, allow_errors: bool = False) -> 
 
 
 def commits_per_repo(repos: list, since: datetime, token: str) -> dict[str, int]:
-    """Commits by the token owner on each repo's default branch since `since`."""
-    uid = gql("query { viewer { id } }", {}, token)["viewer"]["id"]
+    """Commits on each repo's default branch since `since` that are the owner's: authored by
+    the owner's account, or by an author in content.EXTRA_AUTHOR_EMAILS (Claude Code)."""
+    me = gql("query { viewer { login } }", {}, token)["viewer"]["login"].lower()
+    extra = {e.lower() for e in C.EXTRA_AUTHOR_EMAILS}
     out: dict[str, int] = {}
-    for i in range(0, len(repos), 20):
-        chunk = repos[i:i + 20]
-        parts = []
-        for j, r in enumerate(chunk):
-            parts.append(
-                f'r{j}: repository(owner: {json.dumps(r["owner"]["login"])}, name: {json.dumps(r["name"])}) {{'
-                ' defaultBranchRef { target { ... on Commit {'
-                ' history(since: $since, author: {id: $uid}) { totalCount } } } } }'
-            )
-        q = "query($since: GitTimestamp!, $uid: ID!) {" + " ".join(parts) + "}"
-        try:  # one bad repo (empty, no access) shouldn't sink the whole build
-            data = gql(q, {"since": since.isoformat(), "uid": uid}, token, allow_errors=True) or {}
-        except Exception as e:
-            print(f"commit counts skipped for {len(chunk)} repos: {e}")
+    q = """query($owner: String!, $name: String!, $since: GitTimestamp!, $after: String) {
+      repository(owner: $owner, name: $name) { defaultBranchRef { target { ... on Commit {
+        history(since: $since, first: 100, after: $after) {
+          pageInfo { hasNextPage endCursor }
+          nodes { author { email user { login } } }
+        } } } } } }"""
+    for r in repos:
+        n, after = 0, None
+        try:
+            for _ in range(50):  # at most 5,000 commits per repo
+                data = gql(q, {"owner": r["owner"]["login"], "name": r["name"], "since": since.isoformat(),
+                               "after": after}, token, allow_errors=True) or {}
+                ref = ((data.get("repository") or {}).get("defaultBranchRef") or {}).get("target") or {}
+                hist = ref.get("history")
+                if not hist:
+                    break
+                for c in hist["nodes"]:
+                    a = c.get("author") or {}
+                    login = ((a.get("user") or {}).get("login") or "").lower()
+                    if login == me or (a.get("email") or "").lower() in extra:
+                        n += 1
+                if not hist["pageInfo"]["hasNextPage"]:
+                    break
+                after = hist["pageInfo"]["endCursor"]
+        except Exception as e:  # one bad repo shouldn't sink the whole build
+            print(f"commit count skipped for {r['name']}: {e}")
             continue
-        for j, r in enumerate(chunk):
-            ref = (data.get(f"r{j}") or {}).get("defaultBranchRef")
-            if ref and ref.get("target") and "history" in ref["target"]:
-                out[r["name"]] = ref["target"]["history"]["totalCount"]
+        if n:
+            out[r["name"]] = n
     return out
-
 
 def fetch(login: str, token: str) -> dict:
     try:
@@ -505,9 +516,9 @@ def overview_card(d):
     groups, other, other_n = grouped_repos(d["by_repo"])
 
     def render(t, mode):
-        h = 384
+        h = 414
         a, b = t["grad"]
-        cx, cy, R = 214, 208, 92
+        cx, cy, R = 214, 222, 92
         # axes: Code review (top), Issues (right), Pull requests (bottom), Commits (left), like GitHub
         axes = [("Code review", 0, -1), ("Issues", 1, 0), ("Pull requests", 0, 1), ("Commits", -1, 0)]
         grid = "".join(
@@ -561,7 +572,10 @@ def overview_card(d):
         body.append(f'<line x1="{dx0}" y1="70" x2="{dx0}" y2="{h - 34}" stroke="{t["line"]}"/>')
         lx = dx0 + 34
         body.append(f'<g class="f d2">{text(lx, 100, "Contributed to", 15, t["text"], 600)}</g>')
-        top = groups[:6]
+        top = groups[:7]
+        # anything not listed (named projects beyond the top 7, and unnamed repos) goes in the footnote
+        other_all = other + sum(n for _, n in groups[7:])
+        other_count = other_n + len(groups[7:])
         rows = top  # 'other' is a footnote, so it can't dwarf the named bars
         peak = max([n for _, n in rows] or [1])
         bw = W - lx - 28 - 52
@@ -577,9 +591,9 @@ def overview_card(d):
                 + "</g>"
                 + f'<rect class="bar" style="animation-delay:{delay + 0.05:.2f}s" x="{lx}" y="{y + 7}" width="{w:.1f}" height="6" rx="3" fill="{col}"/>'
             )
-        if other:
+        if other_all:
             body.append(f'<g class="f" style="animation-delay:{0.5 + len(rows) * 0.1:.2f}s">'
-                        + text(lx, 134 + len(rows) * 31 + 4, f"+ {other:,} commits across {other_n} other repos",
+                        + text(lx, 134 + len(rows) * 31 + 4, f"+ {other_all:,} commits across {other_count} other repos",
                                13, t["text2"], 500) + "</g>")
         body.append(text(lx, h - 30, "Commits on default branches, last 12 months", 11.5, t["text3"], 500))
         title = ("Activity overview: " + ", ".join(f"{k} {round(pct[k] * 100)}%" for k, _, _ in axes)
