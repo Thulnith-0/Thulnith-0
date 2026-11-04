@@ -573,6 +573,9 @@ def overview_card(d):
         lx = dx0 + 34
         body.append(f'<g class="f d2">{text(lx, 100, "Contributed to", 15, t["text"], 600)}</g>')
         top = groups[:7]
+        # anything not listed (named projects beyond the top 7, and unnamed repos) goes in the footnote
+        other_all = other + sum(n for _, n in groups[7:])
+        other_count = other_n + len(groups[7:])
         rows = top  # 'other' is a footnote, so it can't dwarf the named bars
         peak = max([n for _, n in rows] or [1])
         bw = W - lx - 28 - 52
@@ -588,9 +591,9 @@ def overview_card(d):
                 + "</g>"
                 + f'<rect class="bar" style="animation-delay:{delay + 0.05:.2f}s" x="{lx}" y="{y + 7}" width="{w:.1f}" height="6" rx="3" fill="{col}"/>'
             )
-        if other:
+        if other_all:
             body.append(f'<g class="f" style="animation-delay:{0.5 + len(rows) * 0.1:.2f}s">'
-                        + text(lx, 134 + len(rows) * 31 + 4, f"+ {other:,} commits across {other_n} other repos",
+                        + text(lx, 134 + len(rows) * 31 + 4, f"+ {other_all:,} commits across {other_count} other repos",
                                13, t["text2"], 500) + "</g>")
         body.append(text(lx, h - 30, "Commits on default branches, last 12 months", 11.5, t["text3"], 500))
         title = ("Activity overview: " + ", ".join(f"{k} {round(pct[k] * 100)}%" for k, _, _ in axes)
