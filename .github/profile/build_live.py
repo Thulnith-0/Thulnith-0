@@ -516,9 +516,9 @@ def overview_card(d):
     groups, other, other_n = grouped_repos(d["by_repo"])
 
     def render(t, mode):
-        h = 384
+        h = 414
         a, b = t["grad"]
-        cx, cy, R = 214, 208, 92
+        cx, cy, R = 214, 222, 92
         # axes: Code review (top), Issues (right), Pull requests (bottom), Commits (left), like GitHub
         axes = [("Code review", 0, -1), ("Issues", 1, 0), ("Pull requests", 0, 1), ("Commits", -1, 0)]
         grid = "".join(
@@ -572,7 +572,7 @@ def overview_card(d):
         body.append(f'<line x1="{dx0}" y1="70" x2="{dx0}" y2="{h - 34}" stroke="{t["line"]}"/>')
         lx = dx0 + 34
         body.append(f'<g class="f d2">{text(lx, 100, "Contributed to", 15, t["text"], 600)}</g>')
-        top = groups[:6]
+        top = groups[:7]
         rows = top  # 'other' is a footnote, so it can't dwarf the named bars
         peak = max([n for _, n in rows] or [1])
         bw = W - lx - 28 - 52
