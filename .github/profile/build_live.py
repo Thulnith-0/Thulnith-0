@@ -7,7 +7,9 @@ daily joke) from the GitHub GraphQL API. Run by .github/workflows/profile-cards.
 
 from __future__ import annotations
 
+import base64
 import json
+import re
 import math
 import os
 import sys
@@ -16,7 +18,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import content as C
-from design import W, esc, panel, pulse, svg, text, text_width, write_pair
+from design import W, esc, glint, panel, pulse, svg, text, text_width, wrap, write_pair
 
 API = "https://api.github.com/graphql"
 
@@ -666,7 +668,7 @@ def achievements_card(d):
         x, h = 28, 230
         n = len(items)
         cw = (W - 2 * x) / n
-        body = [f'<g class="f d1">{text(x, 44, "ACHIEVEMENTS", 11.5, t["accent"], 700, spacing=1.6)}</g>']
+        body = [f'<g class="f d1">{text(x, 44, "MILESTONES", 11.5, t["accent"], 700, spacing=1.6)}</g>']
         for i, (label, v, steps, shown) in enumerate(items):
             tier = sum(v >= s for s in steps) - 1
             cx, cy, r = x + cw * i + cw / 2, 118, 40
@@ -685,7 +687,7 @@ def achievements_card(d):
                 + "</g>"
             )
         return svg(W, h, panel(t, W, h, r=22) + "".join(body),
-                   "Achievements: " + ", ".join(f"{l} {s}" for l, _, _, s in items))
+                   "Milestones: " + ", ".join(f"{l} {s}" for l, _, _, s in items))
 
     return render
 
@@ -730,15 +732,151 @@ def thought_card(_d):
     return render
 
 
+# ------------------------------------------------------------------ GitHub achievement badges
+
+BADGE_INFO = {
+    "pull-shark": "Opened pull requests that got merged",
+    "pair-extraordinaire": "Co-authored commits on merged pull requests",
+    "yolo": "Merged a pull request without a review",
+    "quickdraw": "Closed an issue or PR within 5 minutes",
+    "starstruck": "Created a repository with many stars",
+    "galaxy-brain": "Answered discussions",
+    "public-sponsor": "Sponsored open source work",
+    "heart-on-your-sleeve": "Reacted with a heart",
+    "open-sourcerer": "Had pull requests merged in many repos",
+    "arctic-code-vault-contributor": "Code preserved in the Arctic Code Vault",
+}
+TIER_COLORS = {"bronze": "#c08457", "silver": "#9aa3ad", "gold": "#d4a72c"}
+
+
+def _get(url: str) -> bytes:
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (profile-cards)", "Accept-Language": "en"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return r.read()
+
+
+def fetch_badges(login: str) -> list[dict]:
+    """Achievements exactly as shown on the public profile page (GitHub has no API for them).
+    The badge art is downloaded and inlined, because an SVG shown as an image can't load URLs."""
+    html = _get(f"https://github.com/{login}?tab=achievements").decode("utf-8", "replace")
+    seen, out = set(), []
+    for m in re.finditer(r'<img[^>]*alt="Achievement: ([^"]+)"[^>]*>', html):
+        tag = m.group(0)
+        name = m.group(1).strip()
+        slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+        src = re.search(r'src="([^"]+)"', tag)
+        if slug in seen or not src:
+            continue
+        seen.add(slug)
+        after = html[m.end(): m.end() + 1200]
+        tier = re.search(r"achievement-tier-label--(\w+)[^>]*>\s*x(\d+)", after)
+        cut = after.find("</a>")
+        if tier and (cut == -1 or tier.start() < cut):
+            level, count = tier.group(1), int(tier.group(2))
+        else:
+            level, count = None, 1
+        try:
+            raw = _get(src.group(1))
+            mime = "image/png" if raw[:4] == b"\x89PNG" else "image/svg+xml" if b"<svg" in raw[:200] else "image/png"
+            img = f"data:{mime};base64,{base64.b64encode(raw).decode()}"
+        except Exception:
+            img = None
+        out.append({"slug": slug, "name": name, "tier": level, "count": count, "img": img})
+    print(f"achievements found: {', '.join(f'{b['name']} x{b['count']}' for b in out) or 'none'}")
+    return out
+
+
+def badges_card(badges: list[dict]):
+    def render(t, mode):
+        n = max(1, len(badges))
+        h = 330
+        x0 = 28
+        col = (W - 2 * x0) / n if badges else W
+        r = 52 if n <= 4 else 44
+        css = [
+            ".bd{transform-box:fill-box;transform-origin:center;animation:bd .9s cubic-bezier(.3,1.5,.5,1) backwards}"
+            "@keyframes bd{from{transform:translateY(-26px) scale(.6);opacity:0}}",
+            ".fl{animation:fl 4.6s ease-in-out infinite}"
+            "@keyframes fl{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}",
+            ".tc{transform-box:fill-box;transform-origin:center;animation:tc .5s cubic-bezier(.3,1.8,.5,1) backwards}"
+            "@keyframes tc{from{transform:scale(0)}}",
+            ".sp{transform-box:fill-box;transform-origin:center;animation:sp 9s cubic-bezier(.45,0,.25,1) infinite}"
+            "@keyframes sp{0%,88%{transform:none}94%{transform:scaleX(-1)}100%{transform:scaleX(1)}}",
+        ]
+        defs, body = [], [f'<g class="f d1">{text(x0, 44, "GITHUB ACHIEVEMENTS", 11.5, t["accent"], 700, spacing=1.6)}</g>',
+                          f'<g class="f d1">{text(W - x0, 44, f"{len(badges)} earned", 13, t["text2"], 500, anchor="end")}</g>']
+        if not badges:
+            body.append(text(W / 2, h / 2 + 6, "Achievements will appear here as they're earned.", 15, t["text2"], 500, anchor="middle"))
+        for i, b in enumerate(badges):
+            cx, cy = x0 + col * i + col / 2, 140
+            d = 0.25 + i * 0.16
+            # gentle float, each badge on its own phase
+            float_css = f"animation-delay:-{i * 1.15:.2f}s"
+            ring = TIER_COLORS.get(b["tier"] or "", t["line"])
+            defs.append(f'<clipPath id="bc{i}"><circle cx="{cx:.1f}" cy="{cy}" r="{r}"/></clipPath>')
+            gd, gb, gc = glint(f"b{i}", cx - r, cy - r, 2 * r, 2 * r, r, "#ffffff", 0.55 if mode == "light" else 0.35,
+                               2.4 + i * 0.4, 7.5)
+            defs.append(gd)
+            css.append(gc)
+            if b["img"]:
+                art = (f'<image href="{b["img"]}" x="{cx - r:.1f}" y="{cy - r}" width="{2 * r}" height="{2 * r}" '
+                       f'clip-path="url(#bc{i})" preserveAspectRatio="xMidYMid slice"/>')
+            else:
+                k = r / 52
+                art = (f'<circle cx="{cx:.1f}" cy="{cy}" r="{r}" fill="{t["chip"]}"/>'
+                       f'<g transform="translate({cx:.1f} {cy}) scale({k:.3f})" fill="none" stroke="{ring if b["tier"] else t["accent"]}" '
+                       'stroke-width="4" stroke-linecap="round" stroke-linejoin="round">'
+                       '<path d="M-16 -24 H16 V-8 a16 16 0 0 1 -32 0 Z"/>'
+                       '<path d="M-16 -18 h-8 a8 8 0 0 0 8 14 M16 -18 h8 a8 8 0 0 1 -8 14"/>'
+                       '<path d="M0 8 V16 M-12 24 H12 M-8 16 H8 V24 H-8 Z"/></g>')
+            chip = ""
+            if b["count"] > 1:
+                label = f"×{b['count']}"
+                cw = text_width(label, 13, 700) + 18
+                chip = (f'<g class="tc" style="animation-delay:{d + 0.7:.2f}s">'
+                        f'<rect x="{cx + r * 0.42:.1f}" y="{cy + r * 0.52:.1f}" width="{cw:.1f}" height="24" rx="12" '
+                        f'fill="{ring}" stroke="{t["panel"]}" stroke-width="3"/>'
+                        + text(cx + r * 0.42 + cw / 2, cy + r * 0.52 + 16.5, label, 13, "#ffffff", 700, anchor="middle")
+                        + "</g>")
+            tier_label = (b["tier"] or "").capitalize()
+            body.append(
+                f'<g class="bd" style="animation-delay:{d:.2f}s"><g class="fl" style="{float_css}">'
+                f'<g class="sp" style="animation-delay:{3 + i * 1.6:.2f}s">'
+                f'<circle cx="{cx:.1f}" cy="{cy}" r="{r + 5}" fill="{t["chip"]}" stroke="{ring}" stroke-width="2"/>'
+                + art + gb + "</g>" + chip + "</g></g>"
+                + f'<g class="f" style="animation-delay:{d + 0.35:.2f}s">'
+                + text(cx, cy + r + 40, b["name"], 15, t["text"], 700, anchor="middle", spacing=-0.2)
+                + "".join(text(cx, cy + r + 60 + k * 16, ln, 11.5, t["text2"], 500, anchor="middle")
+                          for k, ln in enumerate(wrap(BADGE_INFO.get(b["slug"], "Earned on GitHub"), 11.5, col - 28)[:2]))
+                + (text(cx, cy + r + 100, tier_label, 11.5, ring, 700, anchor="middle") if tier_label else "")
+                + "</g>"
+            )
+        title = "GitHub achievements: " + ", ".join(f"{b['name']}" + (f" x{b['count']}" if b["count"] > 1 else "") for b in badges)
+        return svg(W, h, panel(t, W, h, r=22) + "".join(body), title, "".join(css), "".join(defs))
+
+    return render
+
+
 def main():
     out = Path(sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else "dist")
     if "--sample" in sys.argv:
         d = sample()
+        d["badges"] = [
+            {"slug": "pair-extraordinaire", "name": "Pair Extraordinaire", "tier": "silver", "count": 3, "img": None},
+            {"slug": "pull-shark", "name": "Pull Shark", "tier": "bronze", "count": 2, "img": None},
+            {"slug": "yolo", "name": "YOLO", "tier": None, "count": 1, "img": None},
+            {"slug": "quickdraw", "name": "Quickdraw", "tier": None, "count": 1, "img": None},
+        ]
     else:
         token = os.environ.get("PROFILE_TOKEN") or os.environ.get("GITHUB_TOKEN")
         if not token:
             sys.exit("GITHUB_TOKEN (or PROFILE_TOKEN) is required; use --sample for preview data")
         d = fetch(C.LOGIN, token)
+        try:
+            d["badges"] = fetch_badges(C.LOGIN)
+        except Exception as e:  # never let the badge scrape sink the other cards
+            print(f"achievements unavailable: {e}")
+            d["badges"] = []
     for name, fn in [
         ("stats", stats_card),
         ("streak", streak_card),
@@ -748,6 +886,7 @@ def main():
         ("overview", overview_card),
         ("rhythm", rhythm_card),
         ("achievements", achievements_card),
+        ("badges", lambda dd: badges_card(dd["badges"])),
         ("joke", thought_card),
     ]:
         write_pair(out, name, fn(d))
