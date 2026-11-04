@@ -859,12 +859,130 @@ def badges_card(badges: list[dict]):
 # ------------------------------------------------------------------ custom contribution snake
 
 
-def snake_card(d):
-    """Snake-game style: the snake hunts the nearest active square, eats anything it slides
-    over, grows as it eats, then leaves; the grid refills for the next round. The route is
-    seeded by the date, so each day's hunt is different."""
-    import random
+# ------------------------------------------------------------------ snake game
 
+
+def play_snake(cols: int, rows: int, food: set, seed: int, max_ticks: int = 1100):
+    """A real game of Snake on the contribution board.
+
+    Rules: one square per tick, 90-degree turns only, no reversing, walls are the board
+    edges, the snake may not touch its own body, and it grows by exactly one segment per
+    square eaten. The AI is the classic safe player: take the shortest path to the nearest
+    food only if, after eating it, the snake could still reach its own tail; otherwise
+    follow its tail; failing that, move into the most open space. No safe move = game over.
+    Returns (head path, {path index: cell eaten}, outcome, final length).
+    """
+    import random
+    from collections import deque
+
+    rng = random.Random(seed)
+    row = rng.randint(1, rows - 2)
+    body = deque([(2, row), (1, row), (0, row)])  # head first
+    food = set(food) - set(body)
+    path = list(reversed(body))  # every cell the head has occupied, oldest first
+    eats = {}
+    dirs = [(1, 0), (0, 1), (-1, 0), (0, -1)]
+
+    def inside(c):
+        return 0 <= c[0] < cols and 0 <= c[1] < rows
+
+    def bfs(src, goals, blocked, heading=None):
+        """Shortest path src -> nearest goal avoiding blocked, and among equally short
+        paths the one with the fewest turns (players go straight, then turn; they don't
+        staircase). Dijkstra on (cell, direction) with cost (steps, turns)."""
+        import heapq
+        tie = rng.random
+        start_dir = heading
+        best = {}
+        heap = [(0, 0, tie(), src, start_dir)]
+        prev = {(src, start_dir): None}
+        while heap:
+            dist, turns, _, cur, dr = heapq.heappop(heap)
+            if best.get((cur, dr), (1 << 30, 0)) < (dist, turns):
+                continue
+            if cur in goals and cur != src:
+                out, state = [], (cur, dr)
+                while state[0] != src:
+                    out.append(state[0])
+                    state = prev[state]
+                return out[::-1]
+            for d in dirs:
+                n = (cur[0] + d[0], cur[1] + d[1])
+                if not inside(n) or (n in blocked and n not in goals):
+                    continue
+                cost = (dist + 1, turns + (dr is not None and d != dr))
+                if cost < best.get((n, d), (1 << 30, 0)):
+                    best[(n, d)] = cost
+                    prev[(n, d)] = (cur, dr)
+                    heapq.heappush(heap, (cost[0], cost[1], tie(), n, d))
+        return None
+
+    def area(src, blocked):
+        seen, stack = {src}, [src]
+        while stack:
+            c = stack.pop()
+            for dx, dy in dirs:
+                n = (c[0] + dx, c[1] + dy)
+                if inside(n) and n not in seen and n not in blocked:
+                    seen.add(n)
+                    stack.append(n)
+        return len(seen)
+
+    def safe_after(route):
+        """Play `route` out virtually; afterwards, can the head still reach the tail?"""
+        vb, vf = deque(body), set(food)
+        for c in route:
+            if c in vf:
+                vf.discard(c)
+            else:
+                vb.pop()
+            vb.appendleft(c)
+        tail = vb[-1]
+        return bfs(vb[0], {tail}, set(list(vb)[:-1])) is not None
+
+    outcome = "time"
+    chasing = 0  # ticks spent following the tail; after a long loop, take the risk
+    for _ in range(max_ticks):
+        if not food:
+            outcome = "clear"
+            break
+        head = body[0]
+        blocked = set(list(body)[:-1])  # the tail square frees up as we move
+        step = None
+        heading = (head[0] - body[1][0], head[1] - body[1][1])
+        route = bfs(head, food, blocked, heading)
+        if route and (safe_after(route) or chasing > cols * rows // 2):
+            step = route[0]
+            chasing = 0
+        else:
+            chasing += 1
+            to_tail = bfs(head, {body[-1]}, blocked, heading) if len(body) > 3 else None
+            if to_tail:
+                step = to_tail[0]
+            else:
+                options = [(head[0] + dx, head[1] + dy) for dx, dy in dirs]
+                options = [c for c in options if inside(c) and c not in blocked]
+                if not options:
+                    outcome = "over"
+                    break
+                step = max(options, key=lambda c: (area(c, blocked), rng.random()))
+        eating = step in food
+        if not eating:
+            body.pop()
+        if step in body:
+            outcome = "over"
+            break
+        body.appendleft(step)
+        path.append(step)
+        if eating:
+            food.discard(step)
+            eats[len(path) - 1] = step
+    return path, eats, outcome, len(body)
+
+
+def snake_card(d):
+    """The contribution board as a game of Snake (see play_snake), drawn large: the year is
+    stacked in two halves, older weeks on top, recent weeks below."""
     today = date.today()
     start = today - timedelta(days=52 * 7 + (today.weekday() + 1) % 7)
     days = [(start + timedelta(days=i)) for i in range((today - start).days + 1)]
@@ -876,140 +994,151 @@ def snake_card(d):
         return 0 if v == 0 else 1 + sum(v > c for c in cuts)
 
     weeks = (len(days) + 6) // 7
+    C = (weeks + 1) // 2  # columns per half
+    R = 14  # two stacked bands of 7 weekdays
     lit = {}
     for i, (dt, v) in enumerate(zip(days, vals)):
+        w, wd = i // 7, (dt.weekday() + 1) % 7
+        cell_xy = (w % C, (w // C) * 7 + wd)
         if v:
-            lit[(i // 7, (dt.weekday() + 1) % 7)] = level(v)
+            lit[cell_xy] = level(v)
+    in_data = {((i // 7) % C, ((i // 7) // C) * 7 + (dt.weekday() + 1) % 7) for i, dt in enumerate(days)}
 
-    rng = random.Random(today.toordinal())
-
-    # ---- plan the hunt on the grid (col, row); cols -1 and `weeks` are just off the grid
-    pos = (-1, rng.randint(1, 5))
-    steps = [pos]
-    remaining = set(lit)
-    eat_step = {}  # cell -> index in steps when the head reaches it
-    while remaining:
-        dists = sorted(remaining, key=lambda c: (abs(c[0] - pos[0]) + abs(c[1] - pos[1]), rng.random()))
-        target = rng.choice(dists[:2]) if len(dists) > 1 and rng.random() < 0.35 else dists[0]
-        horizontal_first = rng.random() < 0.5
-        legs = [(target[0], pos[1]), target] if horizontal_first else [(pos[0], target[1]), target]
-        for corner in legs:
-            while pos != corner:
-                dc = (corner[0] > pos[0]) - (corner[0] < pos[0])
-                dr = (corner[1] > pos[1]) - (corner[1] < pos[1])
-                pos = (pos[0] + dc, pos[1]) if dc else (pos[0], pos[1] + dr)
-                steps.append(pos)
-                if pos in remaining:
-                    remaining.discard(pos)
-                    eat_step[pos] = len(steps) - 1
-    # leave off the right edge on the current row
-    while pos[0] < weeks:
-        pos = (pos[0] + 1, pos[1])
-        steps.append(pos)
+    path, eats, outcome, final_len = play_snake(C, R, set(lit), today.toordinal())
+    print(f"snake: {len(path)} moves, ate {len(eats)}/{len(lit)}, {outcome}, length {final_len}")
 
     def render(t, mode):
-        cell, pitch = 12, 15.2
-        gw = (weeks - 1) * pitch + cell
-        x0 = (W - gw) / 2
-        y0 = 74
-        h = round(y0 + 6 * pitch + cell + 36)
-        a, b = t["grad"]
+        pad = 30
+        pitch = (W - 2 * pad) / C
+        cell = pitch * 0.8
+        x0 = pad + (pitch - cell) / 2
+        y0 = 84
+        board_h = (R - 1) * pitch + cell
+        h = round(y0 + board_h + 56)
         shades = [t["track"]] + [f'{t["accent"]}{op}' for op in ("55", "88", "c4", "")]
+        # classic snake green, no purple
+        g_head, g_tail = ("#30d158", "#1e7a3a") if mode == "dark" else ("#28a745", "#1b6e34")
 
-        def centre(c):
+        def ctr(c):
             return x0 + c[0] * pitch + cell / 2, y0 + c[1] * pitch + cell / 2
 
-        n_max, n_base, lag = 34, 9, 0.042
-        speed = max(110.0, min(230.0, (len(steps) * pitch) / 42))  # aim for a ~40-45 s round
-        tail_len = n_max * lag * speed
-        # run-up from far left so every trailing segment starts off-screen, and a run-out to the right
-        y_in, y_out = centre(steps[0])[1], centre(steps[-1])[1]
-        pre = [(-tail_len - 40, y_in)]
-        post = [(W + tail_len + 40, y_out)]
-        pts = pre + [centre(c) for c in steps] + post
-        cum = [0.0]
-        for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
-            cum.append(cum[-1] + abs(x2 - x1) + abs(y2 - y1))
-        total = cum[-1]
-        period = total / speed
-        path_d = "M" + " L".join(f"{x:.1f},{y:.1f}" for x, y in pts)
+        n_moves = len(path) - 3  # the first three cells are the starting body
+        tick = max(0.055, min(0.12, 46.0 / max(n_moves, 1)))
+        play = n_moves * tick
+        pause = 3.2
+        period = play + pause
+        f_end = play / period
 
-        def head_time(k):  # seconds until the head reaches steps[k]
-            return cum[k + len(pre)] / speed
+        def ktime(sec):
+            return min(max(sec / period, 0.0), 1.0)
 
-        meals = sorted(head_time(k) for k in eat_step.values())
-        grow_every = max(1, -(-len(meals) // (n_max - n_base)))
-        grow_times = meals[grow_every - 1::grow_every]
+        # squares: eaten as the head arrives, refilled while the board resets
+        r1, r2 = min(f_end + 0.03, 0.97), min(f_end + 0.07, 0.99)
+        squares, bursts = [], []
+        for c in sorted(in_data | set(lit)):
+            x, y = x0 + c[0] * pitch, y0 + c[1] * pitch
+            squares.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{cell:.1f}" height="{cell:.1f}" rx="6" fill="{shades[0]}"/>')
+        eat_time = {cell_: (k - 2) * tick for k, cell_ in eats.items()}
+        for c, lv in lit.items():
+            x, y = x0 + c[0] * pitch, y0 + c[1] * pitch
+            anim = ""
+            if c in eat_time:
+                a = ktime(eat_time[c])
+                a2 = min(a + 0.006, f_end)
+                anim = (f'<animate attributeName="opacity" dur="{period:.2f}s" repeatCount="indefinite" '
+                        f'keyTimes="0;{a:.5f};{a2:.5f};{r1:.5f};{r2:.5f};1" values="1;1;0;0;1;1"/>')
+                cx_, cy_ = ctr(c)
+                a0 = max(a - 0.0003, 0.00001)
+                a3 = min(a + 0.02, 0.985)
+                bursts.append(
+                    f'<circle cx="{cx_:.1f}" cy="{cy_:.1f}" r="0" fill="none" stroke="{g_head}" stroke-width="2.5" opacity="0">'
+                    f'<animate attributeName="r" dur="{period:.2f}s" repeatCount="indefinite" keyTimes="0;{a0:.5f};{a:.5f};{a3:.5f};1" values="0;0;{cell * 0.35:.1f};{cell * 0.95:.1f};{cell * 0.95:.1f}"/>'
+                    f'<animate attributeName="opacity" dur="{period:.2f}s" repeatCount="indefinite" keyTimes="0;{a0:.5f};{a:.5f};{a3:.5f};1" values="0;0;.9;0;0"/></circle>'
+                )
+            squares.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{cell:.1f}" height="{cell:.1f}" rx="6" fill="{shades[lv]}">{anim}</rect>')
 
-        def kt(x):
-            return f"{min(max(x / period, 0.0), 1.0):.5f}"
+        # ---- the body: one continuous rounded tube drawn along the head's exact path.
+        # It's the route stroked with a single dash from tail to head; per tick the head
+        # advances one square, and the tail advances too unless the snake just ate (the
+        # classic growth rule), so the dash stretches smoothly when it eats.
+        route_pts = [ctr(c) for c in path]
+        route_d = "M" + " L".join(f"{x:.1f},{y:.1f}" for x, y in route_pts)
+        S = len(path) - 1
+        big = S * pitch + 2000
+        eat_idx = sorted(eats)
+        lengths, length, j = [], 3, 0
+        for k in range(n_moves + 1):
+            while j < len(eat_idx) and eat_idx[j] <= k + 2:
+                length += 1
+                j += 1
+            lengths.append(length)
+        times = [ktime(k * tick) for k in range(n_moves + 1)] + [1.0]
+        dash_vals = [f"{(lengths[k] - 1) * pitch:.1f} {big:.0f}" for k in range(n_moves + 1)]
+        off_vals = [f"{-((k + 2) - (lengths[k] - 1)) * pitch:.1f}" for k in range(n_moves + 1)]
+        dash_vals.append(dash_vals[-1])
+        off_vals.append(off_vals[-1])
+        kts = ";".join(f"{x:.5f}" for x in times)
+        dash_anim = (f'<animate attributeName="stroke-dasharray" dur="{period:.2f}s" repeatCount="indefinite" '
+                     f'keyTimes="{kts}" values="{";".join(dash_vals)}"/>'
+                     f'<animate attributeName="stroke-dashoffset" dur="{period:.2f}s" repeatCount="indefinite" '
+                     f'keyTimes="{kts}" values="{";".join(off_vals)}"/>')
 
-        cells = []
-        for (col, row), lv in lit.items():
-            x, y = x0 + col * pitch, y0 + row * pitch
-            te = head_time(eat_step[(col, row)])
-            a1, a2 = te / period, min(te / period + 0.004, 0.97)
-            a0, a3 = max(a1 - 0.0004, 0.00001), min(a1 + 0.012, 0.98)  # burst starts exactly when eaten
-            cells.append(
-                f'<rect x="{x:.1f}" y="{y:.1f}" width="{cell}" height="{cell}" rx="3" fill="{shades[lv]}">'
-                f'<animate attributeName="opacity" dur="{period:.2f}s" repeatCount="indefinite" '
-                f'keyTimes="0;{a1:.5f};{a2:.5f};0.985;1" values="1;1;0;0;1"/></rect>'
-                f'<circle cx="{x + cell / 2:.1f}" cy="{y + cell / 2:.1f}" r="0" fill="none" stroke="{t["accent"]}" stroke-width="2" opacity="0">'
-                f'<animate attributeName="r" dur="{period:.2f}s" repeatCount="indefinite" '
-                f'keyTimes="0;{a0:.5f};{a1:.5f};{a3:.5f};1" values="0;0;3;13;13"/>'
-                f'<animate attributeName="opacity" dur="{period:.2f}s" repeatCount="indefinite" '
-                f'keyTimes="0;{a0:.5f};{a1:.5f};{a3:.5f};1" values="0;0;.9;0;0"/></circle>'
-            )
-        empties = "".join(
-            f'<rect x="{x0 + c * pitch:.1f}" y="{y0 + r * pitch:.1f}" width="{cell}" height="{cell}" rx="3" fill="{shades[0]}"/>'
-            for c in range(weeks) for r in range(7)
-            if c * 7 + r < len(days) or (c, r) in lit
-        )
+        def tube(width, color, extra=""):
+            return (f'<use href="#route" fill="none" stroke="{color}" stroke-width="{width:.1f}" stroke-linecap="round" '
+                    f'stroke-linejoin="round" stroke-dasharray="{dash_vals[0]}" stroke-dashoffset="{off_vals[0]}"{extra}>'
+                    f'{dash_anim}</use>')
 
-        def mix(c1, c2, f):
-            c1, c2 = c1.lstrip("#"), c2.lstrip("#")
-            return "#" + "".join(f"{round(int(c1[k:k + 2], 16) * (1 - f) + int(c2[k:k + 2], 16) * f):02x}" for k in (0, 2, 4))
+        body_w = pitch * 0.74
+        shadow = tube(body_w + 6, "#000000", ' opacity=".22" transform="translate(0 3)"')
+        body_main = tube(body_w, g_head)
+        body_shine = tube(body_w * 0.26, "#ffffff", ' opacity=".14"')  # centred highlight: reads as a round tube
 
-        motion = f'dur="{period:.2f}s" repeatCount="indefinite"'
-        segs = []
-        for i in range(n_max - 1, 0, -1):  # tail first, so the head draws on top
-            f = i / (n_max - 1)
-            r = 5.6 - 2.6 * f
-            vis = ""
-            if i >= n_base:
-                k = i - n_base
-                if k < len(grow_times):
-                    g = grow_times[k]
-                    vis = (f'<animate attributeName="opacity" {motion} '
-                           f'keyTimes="0;{kt(g)};{kt(g + 0.25)};1" values="0;0;1;1"/>')
-                else:
-                    continue  # never grows this long
-            segs.append(
-                f'<circle r="{r:.2f}" fill="{mix(a, b, f)}"{" opacity=\"0\"" if vis else ""}>'
-                f'<animateMotion {motion} begin="{i * lag:.3f}s" rotate="auto"><mpath href="#route"/></animateMotion>{vis}</circle>'
-            )
-        eye = "#ffffff"
+        # head: rides the front of the tube and turns with it
+        f_head0, f_head1 = 2 / S, (n_moves + 2) / S
+        head_motion = (f'<animateMotion dur="{period:.2f}s" repeatCount="indefinite" calcMode="linear" '
+                       f'keyPoints="{f_head0:.5f};{f_head1:.5f};{f_head1:.5f}" keyTimes="0;{f_end:.5f};1" rotate="auto">'
+                       f'<mpath href="#route"/></animateMotion>')
+        hr = body_w * 0.62
+        tongue = (f'<path d="M{hr - 1:.1f},0 h{hr * 0.7:.1f} m0,0 l{hr * 0.28:.1f},-{hr * 0.22:.1f} m-{hr * 0.28:.1f},{hr * 0.22:.1f} '
+                  f'l{hr * 0.28:.1f},{hr * 0.22:.1f}" stroke="#ff4d5e" stroke-width="2" stroke-linecap="round" fill="none" opacity="0">'
+                  f'<animate attributeName="opacity" dur="2.6s" repeatCount="indefinite" keyTimes="0;.06;.12;.18;.24;1" values="0;1;0;1;0;0"/></path>')
         head = (
-            f'<g><circle r="6.6" fill="{a}"/>'
-            f'<circle cx="2.4" cy="-2.7" r="1.35" fill="{eye}"/><circle cx="2.4" cy="2.7" r="1.35" fill="{eye}"/>'
-            f'<circle cx="2.9" cy="-2.7" r=".6" fill="#0b0d11"/><circle cx="2.9" cy="2.7" r=".6" fill="#0b0d11"/>'
-            f'<animateMotion {motion} rotate="auto"><mpath href="#route"/></animateMotion></g>'
+            f'<g>{head_motion}{tongue}'
+            f'<ellipse rx="{hr * 1.08:.1f}" ry="{hr:.1f}" fill="{g_head}"/>'
+            f'<ellipse cx="{-hr * 0.15:.1f}" cy="{-hr * 0.32:.1f}" rx="{hr * 0.55:.1f}" ry="{hr * 0.22:.1f}" fill="#ffffff" opacity=".22"/>'
+            f'<circle cx="{hr * 0.35:.1f}" cy="{-hr * 0.45:.1f}" r="{hr * 0.27:.1f}" fill="#fff"/>'
+            f'<circle cx="{hr * 0.35:.1f}" cy="{hr * 0.45:.1f}" r="{hr * 0.27:.1f}" fill="#fff"/>'
+            f'<circle cx="{hr * 0.45:.1f}" cy="{-hr * 0.45:.1f}" r="{hr * 0.14:.1f}" fill="#0b0d11"/>'
+            f'<circle cx="{hr * 0.45:.1f}" cy="{hr * 0.45:.1f}" r="{hr * 0.14:.1f}" fill="#0b0d11"/></g>'
         )
-        defs = (
-            '<filter id="glow" x="-50%" y="-50%" width="200%" height="200%">'
-            '<feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
-            f'<path id="route" d="{path_d}"/>'
-            f'<clipPath id="card"><rect x="1" y="1" width="{W - 2}" height="{h - 2}" rx="21"/></clipPath>'
+        segs = [shadow, body_main, body_shine, head]
+        fade = (f'<animate attributeName="opacity" dur="{period:.2f}s" repeatCount="indefinite" '
+                f'keyTimes="0;{min(f_end + 0.012, 0.98):.5f};{min(f_end + 0.03, 0.99):.5f};1" values="1;1;0;0"/>')
+        msg = {"clear": f"All clear · {len(eats)} eaten", "over": f"Game over · {len(eats)} eaten"}.get(
+            outcome, f"Round over · {len(eats)} eaten")
+        mw = text_width(msg, 15, 700) + 36
+        cx_b, cy_b = W / 2, y0 + board_h / 2
+        banner = (
+            f'<g opacity="0"><animate attributeName="opacity" dur="{period:.2f}s" repeatCount="indefinite" '
+            f'keyTimes="0;{min(f_end + 0.01, 0.97):.5f};{min(f_end + 0.025, 0.975):.5f};{min(f_end + 0.06, 0.99):.5f};{min(f_end + 0.075, 0.995):.5f};1" '
+            f'values="0;0;1;1;0;0"/>'
+            f'<rect x="{cx_b - mw / 2:.1f}" y="{cy_b - 20:.1f}" width="{mw:.1f}" height="40" rx="20" fill="{t["text"]}"/>'
+            + text(cx_b, cy_b + 5.5, msg, 15, t["panel"], 700, anchor="middle") + "</g>"
         )
-        eaten = len(lit)
+        defs = (f'<path id="route" d="{route_d}"/>'
+                f'<clipPath id="board"><rect x="{x0 - 4:.1f}" y="{y0 - 4}" width="{(C - 1) * pitch + cell + 8:.1f}" height="{board_h + 8:.1f}" rx="10"/></clipPath>')
+        divider_y = y0 + 7 * pitch - (pitch - cell) / 2
         body = (
             f'<g class="f d1">{text(28, 44, "CONTRIBUTION SNAKE", 11.5, t["accent"], 700, spacing=1.6)}</g>'
-            + f'<g class="f d1">{text(W - 28, 44, f"Hunting {eaten} active days · new route every day", 13, t["text2"], 500, anchor="end")}</g>'
-            + empties + "".join(cells)
-            + f'<g clip-path="url(#card)"><g filter="url(#glow)">{"".join(segs)}{head}</g></g>'
+            + f'<g class="f d1">{text(W - 28, 44, f"A real game of Snake on {len(lit)} active days · new game every day", 13, t["text2"], 500, anchor="end")}</g>'
+            + "".join(squares) + "".join(bursts)
+            + f'<line x1="{x0:.1f}" y1="{divider_y:.1f}" x2="{x0 + (C - 1) * pitch + cell:.1f}" y2="{divider_y:.1f}" stroke="{t["line"]}" stroke-dasharray="2 6" opacity=".7"/>'
+            + f'<g clip-path="url(#board)"><g>{fade}{"".join(segs)}</g></g>'
+            + banner
+            + text(28, h - 22, "Top: older half of the year · bottom: recent half · one square per day", 11.5, t["text3"], 500)
         )
-        return svg(W, h, panel(t, W, h, r=22) + body, f"Contribution snake hunting {eaten} active days of the last year",
-                   "", defs)
+        return svg(W, h, panel(t, W, h, r=22) + body,
+                   f"A game of Snake on the contribution board: {msg}", "", defs)
 
     return render
 
