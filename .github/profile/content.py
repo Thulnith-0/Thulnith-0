@@ -165,9 +165,10 @@ JOURNEY = [
     ("Nov 2026", "CRI system"),
 ]
 
-# Repos the "Contributed to" list may name, mapped to how they're shown.
-# Anything not listed here (other private work, coursework repos) is grouped
-# as "Other repos", so private project names and student IDs never appear.
+# Display names for repos in the activity cards. Repos that share a name are grouped
+# (all Mint repos show as one "Mint" row in "Contributed to"); any repo not listed here
+# is shown under its own name. Private repos are private to hide their code only:
+# their activity (names, commit counts) is always shown.
 REPO_NAMES = {
     "autotyper": "AutoTyper",
     "easy-ai-sub": "Easy AI Sub",
@@ -200,3 +201,11 @@ REPO_NAMES = {
 # Commit authors counted as the profile owner's own work, besides the owner's account:
 # commits made by Claude in Claude Code sessions.
 EXTRA_AUTHOR_EMAILS = {"noreply@anthropic.com"}
+
+# Never shown anywhere: student IDs. Some coursework repo names contain them
+# (e.g. w2120618-20232673-CSA-CW), so they're stripped from displayed names.
+STUDENT_ID_PATTERNS = [r"w\d{7}", r"\d{8}"]
+
+# Private repos whose names stay off the public profile (owner's choice). Their commits
+# still count, as a total: "+ N commits in hidden repos". Lowercase repo names.
+HIDDEN_REPOS = {"carbonware_website", "md", "md_preview", "challenge_1"}

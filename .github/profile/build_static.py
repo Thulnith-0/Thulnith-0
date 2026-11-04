@@ -447,6 +447,7 @@ def readme() -> str:
         f'<p align="center">{pic("sections/github", "On GitHub")}</p>',
         f'<p align="center">{pic("stats", "GitHub stats", "49%", True)} {pic("streak", "Contribution streak", "49%", True)}</p>',
         f'<p align="center">{pic("overview", "Activity overview", live=True)}</p>',
+        f'<p align="center">{pic("repos", "Top repositories by commits", live=True)}</p>',
         f'<p align="center">{pic("heatmap", "Contribution calendar", live=True)}</p>',
         f'<p align="center">{pic("rhythm", "Weekly rhythm", live=True)}</p>',
         f'<p align="center">{pic("activity", "Activity over the last 30 days", live=True)}</p>',
