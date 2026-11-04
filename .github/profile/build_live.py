@@ -560,13 +560,13 @@ def overview_card(d):
         lx = dx0 + 34
         body.append(f'<g class="f d2">{text(lx, 100, "Contributed to", 15, t["text"], 600)}</g>')
         top = groups[:5]
-        rows = top + ([("Other repos", other)] if other else [])
+        rows = top  # 'other' is a footnote, so it can't dwarf the named bars
         peak = max([n for _, n in rows] or [1])
         bw = W - lx - 28 - 52
         for i, (name, n) in enumerate(rows):
             y = 134 + i * 31
             w = max(4.0, bw * n / peak)
-            col = t["ramp"][min(i, 3)] if name != "Other repos" else t["ramp"][5]
+            col = t["ramp"][min(i, 3)]
             delay = 0.5 + i * 0.1
             body.append(
                 f'<g class="f" style="animation-delay:{delay:.2f}s">'
@@ -575,11 +575,11 @@ def overview_card(d):
                 + "</g>"
                 + f'<rect class="bar" style="animation-delay:{delay + 0.05:.2f}s" x="{lx}" y="{y + 7}" width="{w:.1f}" height="6" rx="3" fill="{col}"/>'
             )
-        n_named = len(top)
-        foot = f"Commits per project · {sum(n for _, n in rows):,} total"
-        if other_n:
-            foot += f" · {other_n} more repos grouped"
-        body.append(text(lx, h - 30, foot, 11.5, t["text3"], 500))
+        if other:
+            body.append(f'<g class="f" style="animation-delay:{0.5 + len(rows) * 0.1:.2f}s">'
+                        + text(lx, 134 + len(rows) * 31 + 4, f"+ {other:,} commits across {other_n} other repos",
+                               13, t["text2"], 500) + "</g>")
+        body.append(text(lx, h - 30, "Commits on default branches, last 12 months", 11.5, t["text3"], 500))
         title = ("Activity overview: " + ", ".join(f"{k} {round(pct[k] * 100)}%" for k, _, _ in axes)
                  + ". Contributed to " + ", ".join(n for n, _ in top))
         return svg(W, h, panel(t, W, h, r=22) + "".join(body), title, css, defs)
