@@ -18,7 +18,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import content as C
-from design import W, esc, glint, panel, pulse, svg, text, text_width, wrap, write_pair
+from design import W, border_flow, esc, panel, pulse, svg, text, text_width, wrap, write_pair
 
 API = "https://api.github.com/graphql"
 
@@ -238,10 +238,10 @@ def sample() -> dict:
         "days": days,
         "year_total": sum(v for k, v in days.items() if k > (today - timedelta(days=365)).isoformat()),
         "mix": {"Commits": 780, "Pull requests": 128, "Code review": 9, "Issues": 4},
-        "by_repo": [("Mint", 240, True), ("cri-plant-distribution-system", 160, True), ("Sinhala-TTS", 120, True),
-                    ("raawa-studio", 90, True), ("Clamp_PC", 70, True), ("crowdeye-iot-console", 40, True),
+        "by_repo": [("Mint", 240, True), ("cri-plant-distribution-system", 160, True), ("Yo_Chat_Android", 120, True),
+                    ("firestack", 90, True), ("Clamp_PC", 70, True), ("crowdeye-iot-console", 40, True),
                     ("AutoTyper", 30, False), ("w2120618-20232673-CSA-CW", 12, False), ("Mint_Android", 25, True),
-                    ("Carbonware_Website", 18, True), ("Easy-AI-Sub", 9, False), ("MD_Preview", 6, True),
+                    ("Hydra-Panel-0.2", 18, True), ("Easy-AI-Sub", 9, False), ("Clamp_mobile", 6, True),
                     ("Traffic-Flow-Analyzer-4COSC001W-Software-Development-I-Coursework-2024-", 4, False)],
     }
 
@@ -518,12 +518,13 @@ def safe_name(name: str) -> str:
 
 
 def is_hidden(name: str) -> bool:
-    return name.lower() in C.HIDDEN_REPOS
+    import hashlib
+    return hashlib.sha256(name.lower().encode()).hexdigest()[:16] in C.HIDDEN_REPO_HASHES
 
 
 def grouped_repos(by_repo):
     """Repos under their display names; repos that share a name are summed (e.g. Mint).
-    Hidden repos (content.HIDDEN_REPOS) are only counted as a total."""
+    Hidden repos (content.HIDDEN_REPO_HASHES) are only counted as a total."""
     groups: dict[str, int] = {}
     hidden, hidden_n = 0, 0
     for name, n, *_ in by_repo:
@@ -915,8 +916,8 @@ def badges_card(badges: list[dict]):
             d = 0.25 + i * 0.16
             ring = TIER_COLORS.get(b["tier"] or "", t["line"])
             defs.append(f'<clipPath id="bc{i}"><circle cx="{cx:.1f}" cy="{cy}" r="{r}"/></clipPath>')
-            gd, gb, gc = glint(f"b{i}", cx - r, cy - r, 2 * r, 2 * r, r, "#ffffff", 0.55 if mode == "light" else 0.35,
-                               2.6 + i * 0.5, 11)
+            gd, gb, gc = border_flow(f"b{i}", cx - r - 5, cy - r - 5, 2 * r + 10, 2 * r + 10, r + 5,
+                                     *t["grad"], 1.5 + i * 0.6, 8)
             defs.append(gd)
             css.append(gc)
             if b["img"]:

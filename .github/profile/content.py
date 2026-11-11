@@ -3,36 +3,12 @@
 LOGIN = "Thulnith-0"
 NAME = "Thulnith Perera"
 
-HEADLINE = ("I build software people actually use,", "from desktop tools to ", "AI that speaks Sinhala", ".")
+HEADLINE = ("I build software people actually use,", "from desktop tools to ", "intelligent systems", ".")
 META = ("BSc (Hons) Computer Science", "University of Westminster", "3rd year", "Sri Lanka")
 
-HIGHLIGHTS = [
-    ("55.4%", "Sinhala TTS error rate", "(CER), down from 123.1%"),
-    ("v3.4.0", "Clamp desktop, shipping", "with auto-updates"),
-    ("v1.0.0", "antigravity-delegate", "MCP server, with tests"),
-    ("Win + Mac", "AutoTyper, released by", "a GitHub Actions pipeline"),
-]
 
 # kind: "public" links to the repo; "private" shows a Private tag and no link.
 PROJECTS = [
-    {
-        "slug": "sinhala-tts",
-        "name": "Sinhala TTS",
-        "kind": "private",
-        "area": "AI · Speech",
-        "desc": "Native-accent Sinhala text-to-speech fine-tuned from F5-TTS. It gets the schwa right where "
-        "existing Sinhala systems don't. Round-trip CER cut from 123.1% to 55.4%.",
-        "tags": [("pytorch", "PyTorch"), (None, "F5-TTS"), ("openai", "Whisper")],
-    },
-    {
-        "slug": "raawa",
-        "name": "Raawa · Ahanna v1",
-        "kind": "private",
-        "area": "AI · Speech",
-        "desc": "Sinhala speech-to-text for how people really speak, with the English words they mix in "
-        "kept in English. Powers Raawa Studio: on-device Sinhala subtitles for creators.",
-        "tags": [("pytorch", "PyTorch"), ("huggingface", "Transformers"), ("vite", "Vite")],
-    },
     {
         "slug": "crowdeye",
         "name": "CrowdEye",
@@ -119,7 +95,7 @@ STACK = [
     ("Apps", [("electron", "Electron"), ("dotnet", ".NET / WPF"), ("python", "CustomTkinter"),
               ("flutter", "Flutter"), ("android", "Android"), ("capacitor", "Capacitor")]),
     ("AI & ML", [("pytorch", "PyTorch"), ("huggingface", "Hugging Face"), ("opencv", "OpenCV"),
-                 (None, "YOLO"), ("openai", "Whisper"), (None, "F5-TTS"), ("numpy", "NumPy")]),
+                 (None, "YOLO"), ("openai", "Whisper"), ("numpy", "NumPy")]),
     ("Backend", [("postgresql", "PostgreSQL"), ("prisma", "Prisma"), ("firebase", "Firebase"),
                  ("nodedotjs", "Node.js"), (None, "FastMCP")]),
     ("Tooling", [("git", "Git"), ("githubactions", "GitHub Actions"), ("pytest", "pytest"),
@@ -136,18 +112,11 @@ SOCIALS = [
     ("gmail", "Email", "thulnithperera870@gmail.com", "mailto:thulnithperera870@gmail.com"),
 ]
 
-# Cycles in the "Now building" ticker (most recent work first).
-NOW = [
-    "CRI Plant Request System for the Coconut Research Institute",
-    "Raawa Studio: on-device Sinhala subtitles for creators",
-    "Ahanna v1: Sinhala speech-to-text, code-mixed English included",
-    "Sinhala TTS that finally gets the schwa right",
-]
 
 # Terminal "about me": (command, output) pairs, typed out in order.
 TERMINAL = [
     ("whoami", "Thulnith Perera · CS undergrad, University of Westminster · Sri Lanka"),
-    ("cat focus.txt", "Sinhala voice AI  ·  desktop apps  ·  computer vision"),
+    ("cat focus.txt", "AI  ·  desktop apps  ·  computer vision"),
     ("ls ~/shipped", "AutoTyper   Easy-AI-Sub   antigravity-delegate   Clamp"),
     ("echo $MOTTO", "Learn fast. Build hard. Improve constantly."),
 ]
@@ -160,8 +129,6 @@ JOURNEY = [
     ("May 2026", "Easy AI Sub"),
     ("Jun 2026", "Clamp"),
     ("Aug 2026", "antigravity-delegate"),
-    ("Sep 2026", "Sinhala TTS"),
-    ("Oct 2026", "Raawa · Ahanna"),
     ("Nov 2026", "CRI system"),
 ]
 
@@ -177,11 +144,6 @@ REPO_NAMES = {
     "crowdeye-iot-console": "CrowdEye",
     "crowdeye-website": "CrowdEye",
     "crowdeye-marketing-website": "CrowdEye",
-    "sinhala-tts": "Sinhala TTS",
-    "sinhala-stt": "Sinhala speech",
-    "sinhala-speech": "Sinhala speech",
-    "sinhala-speech-common": "Sinhala speech",
-    "raawa-studio": "Raawa Studio",
     "cri-plant-distribution-system": "CRI Plant Request System",
     "clamp_pc": "Clamp",
     "clamp_mobile": "Clamp",
@@ -206,6 +168,18 @@ EXTRA_AUTHOR_EMAILS = {"noreply@anthropic.com"}
 # (e.g. w2120618-20232673-CSA-CW), so they're stripped from displayed names.
 STUDENT_ID_PATTERNS = [r"w\d{7}", r"\d{8}"]
 
-# Private repos whose names stay off the public profile (owner's choice). Their commits
-# still count, as a total: "+ N commits in hidden repos". Lowercase repo names.
-HIDDEN_REPOS = {"carbonware_website", "md", "md_preview", "challenge_1"}
+# Repos whose names stay off the profile (owner's choice). Their commits still count, as
+# a total. Stored as the first 16 hex chars of sha256(lowercase repo name), so the names
+# aren't readable in this public repo. To add one:
+#   python -c "import hashlib;print(hashlib.sha256(b'repo-name').hexdigest()[:16])"
+HIDDEN_REPO_HASHES = {
+    "21262a3cb5337627",
+    "4284445d08ba5d6b",
+    "472e62a0e69e00bb",
+    "84dd92e71bf11162",
+    "8662804e6d830708",
+    "aade094721c39737",
+    "b437457fc5c466e7",
+    "d5b0ea00e403fd3b",
+    "f243d99b7853fc5b",
+}
