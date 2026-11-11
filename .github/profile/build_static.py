@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import content as C
-from design import (MONO, W, chip, esc, glint, google_dots, icon, panel, pulse, shifting_gradient, svg,
+from design import (MONO, W, chip, esc, border_flow, google_dots, icon, panel, pulse, shifting_gradient, svg,
                     text, text_width, wrap, write_pair)
 
 OUT = Path(__file__).resolve().parents[2] / "assets"
@@ -82,7 +82,6 @@ def section(eyebrow, title):
 
 
 SECTIONS = {
-    "highlights": ("Highlights", "Numbers I'm proud of."),
     "work": ("Selected work", "Things I've built."),
     "journey": ("Journey", "How I got here."),
     "stack": ("Toolkit", "What I build with."),
@@ -90,34 +89,6 @@ SECTIONS = {
     "connect": ("Say hello", "Let's connect."),
 }
 
-
-# --------------------------------------------------------------------------- highlights
-
-
-def highlights(t, mode):
-    n, gap, h = len(C.HIGHLIGHTS), 14, 176
-    tw = (W - gap * (n - 1)) / n
-    body, defs, css = [], [grad_def(t, x2="1")], []
-    sheen, strength = ("#ffffff", 0.9) if mode == "light" else ("#ffffff", 0.07)
-    for i, (big, l1, l2) in enumerate(C.HIGHLIGHTS):
-        x = i * (tw + gap)
-        size = 40 if text_width(big, 40, 700) < tw - 44 else 32
-        fill = "url(#g)" if i == 0 else t["text"]
-        gd, gb, gc = glint(f"h{i}", x + 0.5, 0.5, tw - 1, h - 1, 20, sheen, strength, 2.2 + i * 0.35, 10)
-        defs.append(gd)
-        css.append(gc)
-        body.append(
-            f'<g class="f d{i + 1}">'
-            f'<rect x="{x + 0.5:.1f}" y="0.5" width="{tw - 1:.1f}" height="{h - 1}" rx="20" '
-            f'fill="{t["card"]}" stroke="{t["panel_line"]}"/>'
-            + gb
-            + text(x + 24, 78, big, size, fill, 700, spacing=-1.4)
-            + text(x + 24, 122, l1, 13.5, t["text2"], 500)
-            + text(x + 24, 142, l2, 13.5, t["text2"], 500)
-            + "</g>"
-        )
-    return svg(W, h, "".join(body), "Highlights: " + "; ".join(f"{a} {b} {c}" for a, b, c in C.HIGHLIGHTS),
-               "".join(css), "".join(defs))
 
 
 # --------------------------------------------------------------------------- project cards
@@ -128,8 +99,7 @@ CARD_W, CARD_H = 433, 286
 def project(p, idx=0):
     def render(t, mode):
         w, h, x = CARD_W, CARD_H, 28
-        sheen, strength = ("#ffffff", 0.9) if mode == "light" else ("#ffffff", 0.06)
-        gd, gb, gc = glint("p", 0.5, 0.5, w - 1, h - 1, 22, sheen, strength, 1.6 + (idx // 2) * 0.5 + (idx % 2) * 0.25, 11)
+        gd, gb, gc = border_flow("p", 1, 1, w - 2, h - 2, 21.5, *t["grad"], 1.2 + idx * 0.7, 10)
         body = [
             f'<rect x="0.5" y="0.5" width="{w - 1}" height="{h - 1}" rx="22" fill="{t["card"]}" stroke="{t["panel_line"]}"/>',
             gb,
@@ -215,8 +185,8 @@ def social(item, idx=0):
             + icon(ic, pad, (h - size) / 2, size, fg)
             + text(pad + size + 8, h / 2 + fs * 0.36, name, fs, fg, 600)
         )
-        sheen, strength = ("#ffffff", 0.35) if mode == "light" else (t["accent"], 0.28)
-        gd, gb, gc = glint("s", 0.5, 0.5, w - 1, h - 1, h / 2, sheen, strength, 2 + idx * 0.18, 8)
+        a, b = ("#7cc4ff", "#ffffff") if mode == "light" else (t["accent"], "#0071e3")
+        gd, gb, gc = border_flow("s", 1.5, 1.5, w - 3, h - 3, (h - 3) / 2, a, b, 1 + idx * 0.4, 7)
         return svg(round(w), h, body + gb, name, gc, gd)
 
     return render
@@ -276,28 +246,6 @@ def terminal(t, mode):
     title = "About me: " + " ".join(f"$ {c} → {o}." for c, o in C.TERMINAL)
     return svg(W, h2, "".join(body), title, "".join(css))
 
-
-# --------------------------------------------------------------------------- now building ticker
-
-
-def now_building(t, mode):
-    h, n = 84, len(C.NOW)
-    period = n * 3.4
-    frac = 100 / n
-    css = [
-        f"@keyframes nb{{0%{{opacity:0;transform:translateY(12px)}}{frac * 0.12:.1f}%{{opacity:1;transform:none}}"
-        f"{frac * 0.88:.1f}%{{opacity:1;transform:none}}{frac:.1f}%,100%{{opacity:0;transform:translateY(-12px)}}}}"
-    ]
-    body = [panel(t, W, h, r=20)]
-    body.append(pulse(34, h / 2, 4, "#34A853"))
-    body.append(text(50, h / 2 + 4.5, "NOW BUILDING", 12, t["accent"], 700, spacing=1.8))
-    sx = 50 + text_width("NOW BUILDING", 12, 700) + 12 * 1.8 + 22
-    body.append(f'<line x1="{sx - 12}" y1="{h / 2 - 14}" x2="{sx - 12}" y2="{h / 2 + 14}" stroke="{t["line"]}"/>')
-    for i, item in enumerate(C.NOW):
-        rest = "" if i == 0 else ' opacity="0"'
-        css.append(f".nb{i}{{animation:nb {period:.1f}s cubic-bezier(.2,.7,.2,1) {i * period / n:.2f}s infinite}}")
-        body.append(f'<g class="nb{i}"{rest}>' + text(sx + 6, h / 2 + 6, item, 17, t["text"], 600, spacing=-0.2) + "</g>")
-    return svg(W, h, "".join(body), "Now building: " + "; ".join(C.NOW), "".join(css))
 
 
 # --------------------------------------------------------------------------- journey timeline
@@ -411,11 +359,8 @@ def readme() -> str:
         "<!-- Generated by .github/profile/build_static.py. Edit content.py, then re-run it. -->",
         "",
         f'<p align="center">{pic("hero", f"{C.NAME}. {l1} {l2a}{l2b}{l2c}")}</p>',
-        f'<p align="center">{pic("now", "Now building: " + "; ".join(C.NOW))}</p>',
         f'<p align="center">{pic("terminal", "About me: " + " ".join(f"{c}: {o}." for c, o in C.TERMINAL))}</p>',
         "",
-        f'<p align="center">{pic("sections/highlights", "Highlights")}</p>',
-        f'<p align="center">{pic("highlights", "; ".join(" ".join(h) for h in C.HIGHLIGHTS))}</p>',
         "",
         "<br>",
         "",
@@ -473,11 +418,9 @@ f'<p align="center">{pic("snake", "Contribution snake", live=True)}</p>',
 def main():
     (OUT.parent / "README.md").write_text(readme(), encoding="utf-8")
     write_pair(OUT, "hero", hero)
-    write_pair(OUT, "highlights", highlights)
     write_pair(OUT, "stack", stack)
     write_pair(OUT, "footer", footer)
     write_pair(OUT, "terminal", terminal)
-    write_pair(OUT, "now", now_building)
     write_pair(OUT, "journey", journey)
     write_pair(OUT, "marquee", marquee)
     for key, (eb, title) in SECTIONS.items():

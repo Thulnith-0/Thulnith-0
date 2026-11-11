@@ -1,7 +1,7 @@
 """Shared design system for every SVG on the profile README.
 
 Apple-style layout (monochrome, generous space, big type) with a small touch
-of colour: one blue-to-violet accent gradient and Google's four dots as a
+of colour: one blue-to-teal accent gradient and Google's four dots as a
 signature. Every asset is rendered twice, once per GitHub theme.
 """
 
@@ -37,7 +37,7 @@ THEMES = {
         "chip_line": "#e5e5ea",
         "track": "#e8e8ed",
         "accent": "#0071e3",
-        "grad": ("#0071e3", "#7c3aed"),
+        "grad": ("#0071e3", "#0d9488"),  # Apple blue -> teal
         "ramp": ("#0071e3", "#3d8ef0", "#73adf6", "#a4cafa", "#8e8e93", "#aeaeb2", "#c7c7cc", "#dcdce1"),
         "glow": 0.55,
     },
@@ -53,7 +53,7 @@ THEMES = {
         "chip_line": "#2c2f36",
         "track": "#2a2d34",
         "accent": "#2997ff",
-        "grad": ("#2997ff", "#a78bfa"),
+        "grad": ("#2997ff", "#2dd4bf"),  # bright blue -> aqua
         "ramp": ("#2997ff", "#4fa6ff", "#7cbcff", "#a9d3ff", "#8e8e93", "#6e6e73", "#55565c", "#3f4046"),
         "glow": 0.35,
     },
@@ -152,28 +152,31 @@ def pulse(cx: float, cy: float, r: float, color: str) -> str:
     )
 
 
-def glint(uid: str, x: float, y: float, w: float, h: float, r: float, color: str, strength: float,
-          delay: float, period: float = 9.0):
-    """Apple-style light sweep across a rounded rect. Returns (defs, body, css).
+def border_flow(uid: str, x: float, y: float, w: float, h: float, r: float, a: str, b: str,
+                delay: float, period: float = 9.0):
+    """A thin blue gradient light that slowly travels around a rounded rect's edge
+    (Apple-Intelligence style, kept subtle). Returns (defs, body, css).
 
-    The band starts off to the left and only moves while animating, so a viewer
-    that doesn't run animations simply never sees it."""
-    band = max(90.0, w * 0.32)
-    travel = w + band * 2
+    It's a single dash on the outline, moved with stroke-dashoffset; at rest it simply sits
+    as a short accent arc, so nothing depends on the animation running."""
+    import math
+    per = 2 * (w + h - 4 * r) + 2 * math.pi * r
+    dash = per * 0.22
     defs = (
-        f'<linearGradient id="gl{uid}" x1="0" y1="0" x2="1" y2="0.3">'
-        f'<stop offset="0" stop-color="{color}" stop-opacity="0"/>'
-        f'<stop offset=".5" stop-color="{color}" stop-opacity="{strength}"/>'
-        f'<stop offset="1" stop-color="{color}" stop-opacity="0"/></linearGradient>'
-        f'<clipPath id="gc{uid}"><rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{r}"/></clipPath>'
+        f'<linearGradient id="bf{uid}" x1="0" y1="0" x2="1" y2="1">'
+        f'<stop offset="0" stop-color="{a}"/><stop offset="1" stop-color="{b}"/></linearGradient>'
+        f'<filter id="bfg{uid}" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="2.2"/></filter>'
     )
+    shape = f'x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h:.1f}" rx="{r:.1f}" fill="none"'
+    dash_attr = f'stroke-dasharray="{dash:.1f} {per - dash:.1f}" stroke-linecap="round"'
     body = (
-        f'<g clip-path="url(#gc{uid})"><rect class="gl{uid}" x="{x - band:.1f}" y="{y - 2}" '
-        f'width="{band:.1f}" height="{h + 4}" fill="url(#gl{uid})"/></g>'
+        f'<rect class="bf{uid}" {shape} stroke="url(#bf{uid})" stroke-width="4" opacity=".35" '
+        f'filter="url(#bfg{uid})" {dash_attr}/>'
+        f'<rect class="bf{uid}" {shape} stroke="url(#bf{uid})" stroke-width="1.6" opacity=".9" {dash_attr}/>'
     )
     css = (
-        f".gl{uid}{{animation:sw{uid} {period}s cubic-bezier(.45,0,.2,1) {delay:.2f}s infinite}}"
-        f"@keyframes sw{uid}{{0%{{transform:translateX(0)}}30%,100%{{transform:translateX({travel:.0f}px)}}}}"
+        f".bf{uid}{{animation:bf{uid} {period}s linear {delay:.2f}s infinite}}"
+        f"@keyframes bf{uid}{{from{{stroke-dashoffset:0}}to{{stroke-dashoffset:-{per:.1f}}}}}"
     )
     return defs, body, css
 
